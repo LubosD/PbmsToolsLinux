@@ -44,7 +44,7 @@ bool BMS::send_recv(uint8_t adr, uint8_t cmd,
                     Response& resp, std::string& err) {
     auto frame = encode_frame(adr, cmd, data);
     for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
-        if (attempt > 0) serial_.flush();
+        serial_.flush();  // discard any stale data from previous failed commands
         if (!serial_.write(frame, err)) return false;
         std::vector<uint8_t> raw;
         if (!serial_.read_frame(raw, err)) {
