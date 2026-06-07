@@ -418,7 +418,73 @@ void TUI::draw_alarms() {
     if (rrow < LINES - 2) print_status(rrow++, col2, "Sampling",      !(s4 & 0x20));
 }
 void TUI::draw_params() {
-    mvprintw(ROW_CONTENT, 2, "[Parameters — not yet implemented]");
+    if (param_rows_.empty()) {
+        mvprintw(ROW_CONTENT, 2, "Loading parameters...");
+        return;
+    }
+
+    int visible = content_rows();
+    int total   = static_cast<int>(param_rows_.size());
+
+    // Clamp scroll so cursor is visible
+    if (param_cursor_ < param_scroll_) param_scroll_ = param_cursor_;
+    if (param_cursor_ >= param_scroll_ + visible) param_scroll_ = param_cursor_ - visible + 1;
+    param_scroll_ = std::max(0, std::min(param_scroll_, total - visible));
+
+    for (int i = 0; i < visible && (param_scroll_ + i) < total; ++i) {
+        int idx = param_scroll_ + i;
+        int row = ROW_CONTENT + i;
+        const ParamRow& pr = param_rows_[idx];
+
+        bool is_cursor = (idx == param_cursor_ && pr.kind != ParamRow::Kind::HEADING);
+        bool is_editing = is_cursor && edit_mode_;
+
+        if (pr.kind == ParamRow::Kind::HEADING) {
+            attron(A_BOLD | A_UNDERLINE);
+            mvprintw(row, 0, "%-*s", COLS, pr.label.c_str());
+            attroff(A_BOLD | A_UNDERLINE);
+            continue;
+        }
+
+        // Check if this row is dirty
+        bool row_dirty = false;
+        if (pr.group_id >= 0) {
+            bool* flags[] = {
+                &dirty_.cell_ovp, &dirty_.pack_ovp, &dirty_.chg_ocp, &dirty_.dchg_ocp,
+                &dirty_.scp, &dirty_.chg_otp, &dirty_.mosfet_otp, &dirty_.utp,
+                &dirty_.balance, &dirty_.pack_b, &dirty_.equalization,
+                &dirty_.chg_temp, &dirty_.dchg_temp, &dirty_.mos_chg_temp, &dirty_.mos_dchg_temp
+            };
+            if (pr.group_id < 15) row_dirty = *flags[pr.group_id];
+        }
+
+        if (is_cursor) attron(COLOR_PAIR(CP_SELECTED));
+
+        // Label
+        mvprintw(row, 0, "%-18s", pr.label.c_str());
+
+        // Value
+        std::string val_str;
+        if (is_editing) {
+            val_str = edit_buf_ + "_";
+        } else {
+            if (pr.kind == ParamRow::Kind::BOOL) {
+                val_str = *pr.bval ? "ON" : "OFF";
+            } else if (pr.kind == ParamRow::Kind::DOUBLE) {
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(static_cast<int>(pr.precision)) << *pr.dval;
+                val_str = oss.str();
+            } else {
+                val_str = std::to_string(*pr.ival);
+            }
+        }
+
+        if (is_cursor) attroff(COLOR_PAIR(CP_SELECTED));
+
+        if (row_dirty && !is_editing) attron(COLOR_PAIR(CP_OVP_WARN));
+        mvprintw(row, 18, "%-12s %s", val_str.c_str(), pr.unit.c_str());
+        if (row_dirty && !is_editing) attroff(COLOR_PAIR(CP_OVP_WARN));
+    }
 }
 
 void TUI::refresh_live_data() {
@@ -430,7 +496,29 @@ void TUI::refresh_live_data() {
     else if (!err.empty())
         footer_msg_ = err;
 }
-bool TUI::load_params(std::string&) { return true; }
+bool TUI::load_params(std::string& err) {
+    uint8_t addr = static_cast<uint8_t>(current_pack_);
+    if (!bms_.get_cell_ovp(addr,   params_.cell_ovp,   err)) return false;
+    if (!bms_.get_pack_ovp(addr,   params_.pack_ovp,   err)) return false;
+    if (!bms_.get_chg_ocp(addr,    params_.chg_ocp,    err)) return false;
+    if (!bms_.get_dchg_ocp(addr,   params_.dchg_ocp,   err)) return false;
+    if (!bms_.get_scp(             params_.scp,         err)) return false;
+    if (!bms_.get_cell_chg_otp(    params_.chg_otp,     err)) return false;
+    if (!bms_.get_mosfet_otp(      params_.mosfet_otp,  err)) return false;
+    if (!bms_.get_utp(             params_.utp,         err)) return false;
+    if (!bms_.get_balance(         params_.balance,     err)) return false;
+    if (!bms_.get_pack_b(          params_.pack_b,      err)) return false;
+    if (!bms_.get_equalization(    params_.equalization, err)) return false;
+    if (!bms_.get_chg_temp_prot(   params_.chg_temp,    err)) return false;
+    if (!bms_.get_dchg_temp_prot(  params_.dchg_temp,   err)) return false;
+    bms_.get_mos_chg_temp(         params_.mos_chg_temp, err);  // optional
+    bms_.get_mos_dchg_temp(        params_.mos_dchg_temp,err);  // optional
+
+    params_orig_ = params_;
+    dirty_.clear();
+    build_param_rows();
+    return true;
+}
 bool TUI::save_dirty_params(std::string&) { return true; }
 void TUI::revert_params() {}
 void TUI::switch_pack(int delta) {
@@ -459,7 +547,117 @@ void TUI::switch_pack(int delta) {
     footer_msg_.clear();
 }
 void TUI::handle_params_key(int) {}
-void TUI::build_param_rows() {}
+void TUI::build_param_rows() {
+    param_rows_.clear();
+    auto& p = params_;  // current values
+
+    auto heading = [&](const char* title) {
+        param_rows_.push_back({ParamRow::Kind::HEADING, title, "", nullptr, nullptr, nullptr, -1});
+    };
+    auto pb = [&](const char* lbl, bool* v, int gid) {
+        param_rows_.push_back({ParamRow::Kind::BOOL, lbl, "", v, nullptr, nullptr, gid});
+    };
+    auto pd = [&](const char* lbl, double* v, int gid, const char* unit, int prec=3) {
+        ParamRow r{ParamRow::Kind::DOUBLE, lbl, unit, nullptr, v, nullptr, gid};
+        r.precision = prec;
+        param_rows_.push_back(r);
+    };
+    auto pi = [&](const char* lbl, int* v, int gid, const char* unit) {
+        param_rows_.push_back({ParamRow::Kind::INT, lbl, unit, nullptr, nullptr, v, gid});
+    };
+
+    heading("Cell Over-Voltage Protection");
+    pb("  Enable",   &p.cell_ovp.enable,    0);
+    pd("  Protect",  &p.cell_ovp.protect_v, 0, "V");
+    pd("  Alarm",    &p.cell_ovp.alarm_v,   0, "V");
+    pd("  Recover",  &p.cell_ovp.recover_v, 0, "V");
+    pi("  Delay",    &p.cell_ovp.delay_ms,  0, "ms");
+
+    heading("Pack Over-Voltage Protection");
+    pb("  Enable",   &p.pack_ovp.enable,    1);
+    pd("  Protect",  &p.pack_ovp.protect_v, 1, "V");
+    pd("  Alarm",    &p.pack_ovp.alarm_v,   1, "V");
+    pd("  Recover",  &p.pack_ovp.recover_v, 1, "V");
+    pi("  Delay",    &p.pack_ovp.delay_ms,  1, "ms");
+
+    heading("Charge Over-Current Protection");
+    pb("  Enable",   &p.chg_ocp.enable,    2);
+    pd("  Protect",  &p.chg_ocp.protect_a, 2, "A", 1);
+    pd("  Alarm",    &p.chg_ocp.alarm_a,   2, "A", 1);
+    pd("  Recover",  &p.chg_ocp.recover_a, 2, "A", 1);
+    pi("  Delay",    &p.chg_ocp.delay_ms,  2, "ms");
+
+    heading("Discharge Over-Current Protection");
+    pb("  Enable",   &p.dchg_ocp.enable,    3);
+    pd("  Protect",  &p.dchg_ocp.protect_a, 3, "A", 1);
+    pd("  Alarm",    &p.dchg_ocp.alarm_a,   3, "A", 1);
+    pd("  Recover",  &p.dchg_ocp.recover_a, 3, "A", 1);
+    pi("  Delay",    &p.dchg_ocp.delay_ms,  3, "ms");
+
+    heading("Short-Circuit Protection");
+    pb("  Enable",    &p.scp.enable,    4);
+    pi("  Threshold", &p.scp.threshold, 4, "");
+    pi("  Time",      &p.scp.time_us,   4, "us");
+    pi("  Delay",     &p.scp.delay_ms,  4, "ms");
+
+    heading("Charge Over-Temperature Protection");
+    pb("  Enable",   &p.chg_otp.enable,    5);
+    pi("  Trigger",  &p.chg_otp.trigger_c, 5, "\xc2\xb0""C");
+    pi("  Recover",  &p.chg_otp.recover_c, 5, "\xc2\xb0""C");
+    pi("  Delay",    &p.chg_otp.delay_ms,  5, "ms");
+
+    heading("MOSFET Over-Temperature Protection");
+    pi("  Trigger",  &p.mosfet_otp.trigger_c, 6, "\xc2\xb0""C");
+    pi("  Delay",    &p.mosfet_otp.delay_ms,  6, "ms");
+
+    heading("Under-Temperature Protection");
+    pi("  Delay",    &p.utp.delay_ms, 7, "ms");
+
+    heading("Balance (Params A)");
+    pd("  Threshold", &p.balance.threshold_v, 8, "V");
+    pi("  Delta",     &p.balance.delta_mv,    8, "mV");
+
+    heading("Pack Params B");
+    pd("  Voltage",  &p.pack_b.volt_v, 9, "V");
+    pi("  Value",    &p.pack_b.value,  9, "");
+
+    heading("Equalization");
+    pd("  Start V",  &p.equalization.start_v,       10, "V");
+    pi("  Delta",    &p.equalization.delta_pack_mv,  10, "mV");
+    pi("  Cells",    &p.equalization.cell_cnt,       10, "");
+
+    heading("Charge Temperature Protection");
+    pb("  Enable",   &p.chg_temp.enable, 11);
+    for (int k = 0; k < 6; ++k) {
+        std::string lbl = "  Sensor " + std::to_string(k+1);
+        pi(lbl.c_str(), &p.chg_temp.temp[k], 11, "\xc2\xb0""C");
+    }
+
+    heading("Discharge Temperature Protection");
+    pb("  Enable",   &p.dchg_temp.enable, 12);
+    for (int k = 0; k < 6; ++k) {
+        std::string lbl = "  Sensor " + std::to_string(k+1);
+        pi(lbl.c_str(), &p.dchg_temp.temp[k], 12, "\xc2\xb0""C");
+    }
+
+    if (p.mos_chg_temp.present) {
+        heading("MOS Charge Temperature");
+        pb("  Enable",   &p.mos_chg_temp.enable, 13);
+        for (int k = 0; k < 3; ++k) {
+            std::string lbl = "  Sensor " + std::to_string(k+1);
+            pi(lbl.c_str(), &p.mos_chg_temp.temp[k], 13, "\xc2\xb0""C");
+        }
+    }
+
+    if (p.mos_dchg_temp.present) {
+        heading("MOS Discharge Temperature");
+        pb("  Enable",   &p.mos_dchg_temp.enable, 14);
+        for (int k = 0; k < 6; ++k) {
+            std::string lbl = "  Sensor " + std::to_string(k+1);
+            pi(lbl.c_str(), &p.mos_dchg_temp.temp[k], 14, "\xc2\xb0""C");
+        }
+    }
+}
 
 int TUI::content_rows() const { return LINES - ROW_CONTENT - 1; }
 int TUI::content_cols() const { return COLS; }
