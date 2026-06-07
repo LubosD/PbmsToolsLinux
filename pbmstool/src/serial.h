@@ -8,6 +8,12 @@ namespace pace {
 class Serial {
 public:
     ~Serial();
+    Serial() = default;
+    Serial(const Serial&)            = delete;
+    Serial& operator=(const Serial&) = delete;
+    Serial(Serial&&)                 = default;
+    Serial& operator=(Serial&&)      = default;
+
     bool open(const std::string& port, int baud, int timeout_ms);
     void close();
     bool write(const std::vector<uint8_t>& data, std::string& err);

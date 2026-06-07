@@ -1,6 +1,7 @@
 #pragma once
 #include "protocol.h"
 #include "serial.h"
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -28,7 +29,7 @@ struct AlarmData {
     uint8_t charge_curr_state = 0;
     uint8_t total_volt_state = 0;
     uint8_t discharge_curr_state = 0;
-    uint8_t status[9] = {};
+    std::array<uint8_t, 9> status = {};
 };
 
 struct BalanceParams {
