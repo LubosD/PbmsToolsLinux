@@ -105,4 +105,39 @@ bool BMS::get_analog(uint8_t addr, AnalogData& out, std::string& err) {
     return true;
 }
 
+bool BMS::get_alarm(uint8_t addr, AlarmData& out, std::string& err) {
+    Response resp;
+    if (!send_recv(addr, CMD_ALARM, {}, resp, err)) return false;
+    if (resp.rtn != 0) { err = "BMS error RTN=" + std::to_string(resp.rtn); return false; }
+
+    const auto& d = resp.data;
+    if (d.size() < 3) { err = "alarm response too short"; return false; }
+
+    size_t i = 2;
+    out.cell_count = d[i++];
+    if (out.cell_count > 16) { err = "cell count > 16"; return false; }
+    if (d.size() < i + static_cast<size_t>(out.cell_count) + 1)
+        { err = "alarm response truncated (cells)"; return false; }
+
+    out.cell_volt_alarm.assign(d.begin() + i, d.begin() + i + out.cell_count);
+    i += out.cell_count;
+
+    out.temp_count = d[i++];
+    if (out.temp_count > 16) { err = "temp count > 16"; return false; }
+    if (d.size() < i + static_cast<size_t>(out.temp_count) + 12)
+        { err = "alarm response truncated (temps)"; return false; }
+
+    out.temp_alarm.assign(d.begin() + i, d.begin() + i + out.temp_count);
+    i += out.temp_count;
+
+    out.charge_curr_state    = d[i++];
+    out.total_volt_state     = d[i++];
+    out.discharge_curr_state = d[i++];
+
+    for (int k = 0; k < 9 && i < d.size(); ++k)
+        out.status[k] = d[i++];
+
+    return true;
+}
+
 } // namespace pace
