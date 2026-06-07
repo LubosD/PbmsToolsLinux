@@ -201,7 +201,7 @@ void TUI::draw_footer() {
     } else {
         mvprintw(row, 0, "%-*s",
             COLS - 1,
-            "↑↓ navigate  digits: edit  Space: toggle  s: save  Esc: revert");
+            "Up/Dn: navigate  digits: edit  Space: toggle  s: save  Esc: revert");
     }
 }
 
