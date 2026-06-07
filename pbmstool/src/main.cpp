@@ -107,17 +107,17 @@ int main(int argc, char* argv[]) {
         std::cout << "pack=" << static_cast<int>(pack) << "\n";
         std::cout << "cell_count=" << al.cell_count << "\n";
         for (int k = 0; k < al.cell_count; ++k)
-            std::cout << "cell_" << (k+1) << "_volt_alarm=" << (int)al.cell_volt_alarm[k] << "\n";
+            std::cout << "cell_" << (k+1) << "_volt_alarm=" << static_cast<int>(al.cell_volt_alarm[k]) << "\n";
         std::cout << "temp_count=" << al.temp_count << "\n";
         for (int k = 0; k < al.temp_count; ++k)
-            std::cout << "temp_" << (k+1) << "_alarm=" << (int)al.temp_alarm[k] << "\n";
-        std::cout << "charge_curr_state="    << (int)al.charge_curr_state    << "\n";
-        std::cout << "total_volt_state="     << (int)al.total_volt_state     << "\n";
-        std::cout << "discharge_curr_state=" << (int)al.discharge_curr_state << "\n";
+            std::cout << "temp_" << (k+1) << "_alarm=" << static_cast<int>(al.temp_alarm[k]) << "\n";
+        std::cout << "charge_curr_state="    << static_cast<int>(al.charge_curr_state)    << "\n";
+        std::cout << "total_volt_state="     << static_cast<int>(al.total_volt_state)     << "\n";
+        std::cout << "discharge_curr_state=" << static_cast<int>(al.discharge_curr_state) << "\n";
         for (int k = 0; k < 9; ++k)
             std::cout << "status" << (k+1) << "=0x"
                       << std::hex << std::setw(2) << std::setfill('0')
-                      << (int)al.status[k] << std::dec << "\n";
+                      << static_cast<int>(al.status[k]) << std::dec << "\n";
         return 0;
     }
 
