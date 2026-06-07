@@ -237,9 +237,12 @@ void TUI::draw_params() {
 
 void TUI::refresh_live_data() {
     std::string err;
-    bms_.get_analog(static_cast<uint8_t>(current_pack_), analog_, err);
-    bms_.get_alarm (static_cast<uint8_t>(current_pack_), alarm_,  err);
-    last_refresh_ = std::chrono::steady_clock::now();
+    bool ok = bms_.get_analog(static_cast<uint8_t>(current_pack_), analog_, err);
+    ok = bms_.get_alarm(static_cast<uint8_t>(current_pack_), alarm_, err) && ok;
+    if (ok)
+        last_refresh_ = std::chrono::steady_clock::now();
+    else if (!err.empty())
+        footer_msg_ = err;
 }
 bool TUI::load_params(std::string&) { return true; }
 bool TUI::save_dirty_params(std::string&) { return true; }
@@ -259,7 +262,8 @@ void TUI::switch_pack(int delta) {
 
     std::string err;
     refresh_live_data();
-    load_params(err);
+    if (!load_params(err))
+        footer_msg_ = err;
     param_cursor_ = 0;
     // Advance past heading rows
     while (param_cursor_ < static_cast<int>(param_rows_.size()) &&
