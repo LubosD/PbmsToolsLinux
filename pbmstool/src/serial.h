@@ -11,8 +11,11 @@ public:
     Serial() = default;
     Serial(const Serial&)            = delete;
     Serial& operator=(const Serial&) = delete;
-    Serial(Serial&&)                 = default;
-    Serial& operator=(Serial&&)      = default;
+    Serial(Serial&& o) noexcept : fd_(o.fd_) { o.fd_ = -1; }
+    Serial& operator=(Serial&& o) noexcept {
+        if (this != &o) { close(); fd_ = o.fd_; o.fd_ = -1; }
+        return *this;
+    }
 
     bool open(const std::string& port, int baud, int timeout_ms);
     void close();

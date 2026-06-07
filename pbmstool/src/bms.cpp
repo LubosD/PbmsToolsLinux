@@ -80,6 +80,7 @@ bool BMS::get_analog(uint8_t addr, AnalogData& out, std::string& err) {
     }
 
     out.temp_count = d[i++];
+    if (out.temp_count > 16) { err = "temp count > 16"; return false; }
     if (d.size() < i + static_cast<size_t>(out.temp_count) * 2 + 11)
         { err = "analog response truncated (temps)"; return false; }
 
