@@ -455,7 +455,7 @@ void TUI::draw_params() {
                 &dirty_.balance, &dirty_.pack_b, &dirty_.equalization,
                 &dirty_.chg_temp, &dirty_.dchg_temp, &dirty_.mos_chg_temp, &dirty_.mos_dchg_temp
             };
-            if (pr.group_id < 15) row_dirty = *flags[pr.group_id];
+            if (pr.group_id < static_cast<int>(std::size(flags))) row_dirty = *flags[pr.group_id];
         }
 
         if (is_cursor) attron(COLOR_PAIR(CP_SELECTED));
@@ -472,7 +472,7 @@ void TUI::draw_params() {
                 val_str = *pr.bval ? "ON" : "OFF";
             } else if (pr.kind == ParamRow::Kind::DOUBLE) {
                 std::ostringstream oss;
-                oss << std::fixed << std::setprecision(static_cast<int>(pr.precision)) << *pr.dval;
+                oss << std::fixed << std::setprecision(pr.precision) << *pr.dval;
                 val_str = oss.str();
             } else {
                 val_str = std::to_string(*pr.ival);
@@ -482,7 +482,6 @@ void TUI::draw_params() {
         // Print value — if dirty and not currently selected or editing, highlight yellow
         bool show_dirty = row_dirty && !is_cursor && !is_editing;
         if (show_dirty) {
-            if (is_cursor) attroff(COLOR_PAIR(CP_SELECTED));
             attron(COLOR_PAIR(CP_OVP_WARN));
         }
         mvprintw(row, 18, "%-12s %s", val_str.c_str(), pr.unit.c_str());

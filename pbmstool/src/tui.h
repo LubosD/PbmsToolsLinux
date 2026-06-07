@@ -55,7 +55,7 @@ struct ParamRow {
     double* dval = nullptr;
     int*    ival = nullptr;
     int     group_id = -1;  // maps to DirtyFlags field; -1 = not editable
-    double  precision = 3;  // decimal places for display of doubles
+    int  precision = 3;  // decimal places for display of doubles
 };
 
 class TUI {
