@@ -59,4 +59,50 @@ bool BMS::get_version(uint8_t addr, std::string& version, std::string& err) {
     return true;
 }
 
+bool BMS::get_analog(uint8_t addr, AnalogData& out, std::string& err) {
+    Response resp;
+    if (!send_recv(addr, CMD_ANALOG, {}, resp, err)) return false;
+    if (resp.rtn != 0) { err = "BMS error RTN=" + std::to_string(resp.rtn); return false; }
+
+    const auto& d = resp.data;
+    if (d.size() < 3) { err = "analog response too short"; return false; }
+
+    size_t i = 2;  // skip DATAFLAG and pack-address bytes
+    out.cell_count = d[i++];
+    if (out.cell_count > 16) { err = "cell count > 16"; return false; }
+    if (d.size() < i + static_cast<size_t>(out.cell_count) * 2 + 1)
+        { err = "analog response truncated (cells)"; return false; }
+
+    out.cell_mv.resize(out.cell_count);
+    for (int k = 0; k < out.cell_count; ++k) {
+        out.cell_mv[k] = static_cast<double>((d[i] << 8) | d[i+1]);
+        i += 2;
+    }
+
+    out.temp_count = d[i++];
+    if (d.size() < i + static_cast<size_t>(out.temp_count) * 2 + 8)
+        { err = "analog response truncated (temps)"; return false; }
+
+    out.temp_raw.resize(out.temp_count);
+    for (int k = 0; k < out.temp_count; ++k) {
+        out.temp_raw[k] = static_cast<double>((d[i] << 8) | d[i+1]);
+        i += 2;
+    }
+
+    out.current_10ma  = static_cast<int16_t>((d[i] << 8) | d[i+1]); i += 2;
+    out.total_volt_mv = static_cast<uint16_t>((d[i] << 8) | d[i+1]); i += 2;
+    uint16_t rem_raw  = static_cast<uint16_t>((d[i] << 8) | d[i+1]); i += 2;
+    out.remain_cap_mah = static_cast<int>(rem_raw) * 10;
+    uint16_t full_raw  = static_cast<uint16_t>((d[i] << 8) | d[i+1]); i += 2;
+    out.full_cap_mah   = static_cast<int>(full_raw) * 10;
+    ++i;  // skip custom number byte
+    out.cycle          = static_cast<uint16_t>((d[i] << 8) | d[i+1]); i += 2;
+    if (i + 1 < d.size()) {
+        uint16_t des_raw   = static_cast<uint16_t>((d[i] << 8) | d[i+1]);
+        out.design_cap_mah = static_cast<int>(des_raw) * 10;
+    }
+
+    return true;
+}
+
 } // namespace pace
