@@ -321,7 +321,99 @@ void TUI::draw_analog() {
     mvprintw(rrow++, col2, "  Cycles   %d", static_cast<int>(analog_.cycle));
 }
 void TUI::draw_alarms() {
-    mvprintw(ROW_CONTENT, 2, "[Alarm data — not yet implemented]");
+    int row = ROW_CONTENT;
+    int cols = COLS;
+    int col2 = cols / 2;
+
+    auto print_status = [&](int r, int c, const char* label, bool ok) {
+        mvprintw(r, c, "  %-22s", label);
+        if (ok) {
+            attron(COLOR_PAIR(CP_OK) | A_BOLD);
+            printw("OK");
+            attroff(COLOR_PAIR(CP_OK) | A_BOLD);
+        } else {
+            attron(COLOR_PAIR(CP_UVP_FAULT) | A_BOLD);
+            printw("TRIGGERED");
+            attroff(COLOR_PAIR(CP_UVP_FAULT) | A_BOLD);
+        }
+    };
+
+    auto print_mos = [&](int r, int c, const char* label, bool on) {
+        mvprintw(r, c, "  %-12s", label);
+        if (on) {
+            attron(COLOR_PAIR(CP_OK) | A_BOLD);
+            printw("● ON");
+            attroff(COLOR_PAIR(CP_OK) | A_BOLD);
+        } else {
+            attron(A_DIM);
+            printw("○ OFF");
+            attroff(A_DIM);
+        }
+    };
+
+    // ── Left: MOSFET status + protection events ──
+    mvprintw(row++, 0, "  MOSFET STATUS");
+    bool chg_on  = (alarm_.status[2] & 0x02) != 0;
+    bool dchg_on = (alarm_.status[2] & 0x04) != 0;
+    bool bal_on  = false;
+    for (int b = 0; b < 2; ++b)
+        if (alarm_.status[5 + b]) { bal_on = true; break; }
+    print_mos(row++, 0, "Charge",    chg_on);
+    print_mos(row++, 0, "Discharge", dchg_on);
+    print_mos(row++, 0, "Balance",   bal_on);
+
+    ++row;
+    mvprintw(row++, 0, "  PROTECTION EVENTS");
+    uint8_t s0 = alarm_.status[0];
+    uint8_t s1 = alarm_.status[1];
+    print_status(row++, 0, "Cell OVP",      !(s0 & 0x01));
+    print_status(row++, 0, "Cell UVP",      !(s0 & 0x02));
+    print_status(row++, 0, "Pack OVP",      !(s0 & 0x04));
+    print_status(row++, 0, "Pack UVP",      !(s0 & 0x08));
+    print_status(row++, 0, "Chg OCP",       !(s0 & 0x10));
+    print_status(row++, 0, "Dchg OCP",      !(s0 & 0x20));
+    print_status(row++, 0, "Short circuit", !(s0 & 0x40));
+    print_status(row++, 0, "Chg OTP",       !(s1 & 0x01));
+    print_status(row++, 0, "Dchg OTP",      !(s1 & 0x04));
+    print_status(row++, 0, "MOS OTP",       !(s1 & 0x40));
+    print_status(row++, 0, "Under-temp",    !(s1 & 0x02));
+
+    // ── Right: per-cell alarm grid ──
+    int rrow = ROW_CONTENT;
+    mvprintw(rrow++, col2, "  CELL ALARMS");
+
+    for (int k = 0; k < alarm_.cell_count && rrow < LINES - 2; ++k) {
+        int bi = (k < 8) ? 5 : 6;
+        bool bal = (alarm_.status[bi] >> (k % 8)) & 1;
+        uint8_t va = (k < static_cast<int>(alarm_.cell_volt_alarm.size()))
+                     ? alarm_.cell_volt_alarm[k] : 0;
+
+        const char* lbl;
+        int cp;
+        attr_t ex = A_NORMAL;
+        if      (va & 0x02) { lbl = "UVP!";     cp = CP_UVP_FAULT; ex = A_BOLD; }
+        else if (va & 0x08) { lbl = "OVP!";     cp = CP_OVP_FAULT; ex = A_BOLD; }
+        else if (va & 0x01) { lbl = "UVP warn"; cp = CP_UVP_WARN;  ex = A_BOLD; }
+        else if (va & 0x04) { lbl = "OVP warn"; cp = CP_OVP_WARN;  }
+        else if (bal)        { lbl = "BAL";      cp = CP_BALANCE;   }
+        else                 { lbl = "OK";       cp = CP_OK;        }
+
+        mvprintw(rrow, col2, "  #%2d  ", k + 1);
+        attron(COLOR_PAIR(cp) | ex);
+        printw("%-8s", lbl);
+        attroff(COLOR_PAIR(cp) | ex);
+        ++rrow;
+    }
+
+    // Hardware faults
+    ++rrow;
+    mvprintw(rrow++, col2, "  HARDWARE FAULTS");
+    uint8_t s4 = alarm_.status[4];
+    if (rrow < LINES - 2) print_status(rrow++, col2, "Charge MOS",    !(s4 & 0x01));
+    if (rrow < LINES - 2) print_status(rrow++, col2, "Discharge MOS", !(s4 & 0x02));
+    if (rrow < LINES - 2) print_status(rrow++, col2, "Temp sensor",   !(s4 & 0x04));
+    if (rrow < LINES - 2) print_status(rrow++, col2, "Cell fault",    !(s4 & 0x10));
+    if (rrow < LINES - 2) print_status(rrow++, col2, "Sampling",      !(s4 & 0x20));
 }
 void TUI::draw_params() {
     mvprintw(ROW_CONTENT, 2, "[Parameters — not yet implemented]");
