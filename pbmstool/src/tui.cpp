@@ -235,11 +235,39 @@ void TUI::draw_params() {
     mvprintw(ROW_CONTENT, 2, "[Parameters — not yet implemented]");
 }
 
-void TUI::refresh_live_data() {}
+void TUI::refresh_live_data() {
+    std::string err;
+    bms_.get_analog(static_cast<uint8_t>(current_pack_), analog_, err);
+    bms_.get_alarm (static_cast<uint8_t>(current_pack_), alarm_,  err);
+    last_refresh_ = std::chrono::steady_clock::now();
+}
 bool TUI::load_params(std::string&) { return true; }
 bool TUI::save_dirty_params(std::string&) { return true; }
 void TUI::revert_params() {}
-void TUI::switch_pack(int) {}
+void TUI::switch_pack(int delta) {
+    if (pack_count_ <= 1) return;
+
+    if (dirty_.any()) {
+        footer_msg_ = "Unsaved changes — press s to save or Esc to discard";
+        return;
+    }
+
+    int next = current_pack_ + delta;
+    if (next < 1) next = pack_count_;
+    if (next > pack_count_) next = 1;
+    current_pack_ = next;
+
+    std::string err;
+    refresh_live_data();
+    load_params(err);
+    param_cursor_ = 0;
+    // Advance past heading rows
+    while (param_cursor_ < static_cast<int>(param_rows_.size()) &&
+           param_rows_[param_cursor_].kind == ParamRow::Kind::HEADING)
+        ++param_cursor_;
+    edit_mode_ = false;
+    footer_msg_.clear();
+}
 void TUI::handle_params_key(int) {}
 void TUI::build_param_rows() {}
 
