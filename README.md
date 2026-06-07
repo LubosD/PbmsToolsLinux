@@ -2,15 +2,6 @@
 
 A Linux command-line tool for communicating with **Pace BMS** hardware over a serial port. Reverse-engineered from `PbmsTools V2.5` (the original Windows GUI).
 
-## Components
-
-| Directory | Description |
-|---|---|
-| `pbmstool/` | C++17 CLI tool (the main product) |
-| `pbmstoolsgui/` | Original Windows GUI source (C#, reference only) |
-| `pacedal/` | Original Windows data access layer (C#, reference only) |
-| `paceentities/` | Original Windows entity classes (C#, reference only) |
-
 ## Building
 
 Requires CMake ≥ 3.14 and a C++17 compiler. No external dependencies.
