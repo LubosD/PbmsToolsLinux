@@ -123,9 +123,9 @@ public:
     bool get_cell_ovp(uint8_t addr, CellVoltProtParams& out, std::string& err);
     bool set_cell_ovp(const CellVoltProtParams& p, std::string& err);
 
-    // Cell voltage under-protection (CMD 0xD5/0xD4)
-    bool get_cell_uvp(uint8_t addr, CellVoltProtParams& out, std::string& err);
-    bool set_cell_uvp(const CellVoltProtParams& p, std::string& err);
+    // Pack over-voltage protection (CMD 0xD5/0xD4)
+    bool get_pack_ovp(uint8_t addr, CellVoltProtParams& out, std::string& err);
+    bool set_pack_ovp(const CellVoltProtParams& p, std::string& err);
 
     // Charge overcurrent protection (CMD 0xD3/0xD2)
     bool get_chg_ocp(uint8_t addr, CurrProtParams& out, std::string& err);

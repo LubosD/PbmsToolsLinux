@@ -12,8 +12,8 @@ static constexpr uint8_t CMD_CELL_OVP_R   = 0xD1;
 static constexpr uint8_t CMD_CELL_OVP_W   = 0xD0;
 static constexpr uint8_t CMD_CHG_OCP_R    = 0xD3;
 static constexpr uint8_t CMD_CHG_OCP_W    = 0xD2;
-static constexpr uint8_t CMD_CELL_UVP_R   = 0xD5;
-static constexpr uint8_t CMD_CELL_UVP_W   = 0xD4;
+static constexpr uint8_t CMD_PACK_OVP_R   = 0xD5;
+static constexpr uint8_t CMD_PACK_OVP_W   = 0xD4;
 static constexpr uint8_t CMD_DCHG_OCP_R   = 0xD7;
 static constexpr uint8_t CMD_DCHG_OCP_W   = 0xD6;
 static constexpr uint8_t CMD_SCP_R        = 0xD9;
@@ -236,17 +236,17 @@ static bool parse_curr_prot(const std::vector<uint8_t>& d,
                              CurrProtParams& out, std::string& err) {
     if (d.size() < 8) { err = "response too short"; return false; }
     out.enable    = d[0] > 0;
-    out.protect_a = static_cast<uint16_t>((d[1] << 8) | d[2]) / 1000.0;
-    out.alarm_a   = static_cast<uint16_t>((d[3] << 8) | d[4]) / 1000.0;
-    out.recover_a = static_cast<uint16_t>((d[5] << 8) | d[6]) / 1000.0;
+    out.protect_a = static_cast<uint16_t>((d[1] << 8) | d[2]) / 100.0;
+    out.alarm_a   = static_cast<uint16_t>((d[3] << 8) | d[4]) / 100.0;
+    out.recover_a = static_cast<uint16_t>((d[5] << 8) | d[6]) / 100.0;
     out.delay_ms  = d[7] * 100;
     return true;
 }
 
 static std::vector<uint8_t> encode_curr_prot(const CurrProtParams& p) {
-    uint16_t prot = static_cast<uint16_t>(static_cast<int>(p.protect_a * 1000.0 + 0.5));
-    uint16_t alrm = static_cast<uint16_t>(static_cast<int>(p.alarm_a   * 1000.0 + 0.5));
-    uint16_t recv = static_cast<uint16_t>(static_cast<int>(p.recover_a * 1000.0 + 0.5));
+    uint16_t prot = static_cast<uint16_t>(static_cast<int>(p.protect_a * 100.0 + 0.5));
+    uint16_t alrm = static_cast<uint16_t>(static_cast<int>(p.alarm_a   * 100.0 + 0.5));
+    uint16_t recv = static_cast<uint16_t>(static_cast<int>(p.recover_a * 100.0 + 0.5));
     uint8_t  dly  = static_cast<uint8_t>(p.delay_ms / 100);
     return {
         static_cast<uint8_t>(p.enable ? 1 : 0),
@@ -306,18 +306,18 @@ bool BMS::set_cell_ovp(const CellVoltProtParams& p, std::string& err) {
     return true;
 }
 
-// --- Cell UVP ---
+// --- Pack OVP ---
 
-bool BMS::get_cell_uvp(uint8_t addr, CellVoltProtParams& out, std::string& err) {
+bool BMS::get_pack_ovp(uint8_t addr, CellVoltProtParams& out, std::string& err) {
     Response resp;
-    if (!send_recv(addr, CMD_CELL_UVP_R, {}, resp, err)) return false;
+    if (!send_recv(addr, CMD_PACK_OVP_R, {}, resp, err)) return false;
     if (resp.rtn != 0) { err = "BMS error RTN=" + std::to_string(resp.rtn); return false; }
     return parse_volt_prot(resp.data, out, err);
 }
 
-bool BMS::set_cell_uvp(const CellVoltProtParams& p, std::string& err) {
+bool BMS::set_pack_ovp(const CellVoltProtParams& p, std::string& err) {
     Response resp;
-    if (!send_recv(0x00, CMD_CELL_UVP_W, encode_volt_prot(p), resp, err)) return false;
+    if (!send_recv(0x00, CMD_PACK_OVP_W, encode_volt_prot(p), resp, err)) return false;
     if (resp.rtn != 0) { err = "BMS error RTN=" + std::to_string(resp.rtn); return false; }
     return true;
 }

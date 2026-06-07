@@ -24,7 +24,7 @@ static void usage(const char* prog) {
                  "\n"
                  "Settable parameter keys (params set):\n"
                  "  cell-ovp-enable, cell-ovp-protect, cell-ovp-alarm, cell-ovp-recover, cell-ovp-delay\n"
-                 "  cell-uvp-enable, cell-uvp-protect, cell-uvp-alarm, cell-uvp-recover, cell-uvp-delay\n"
+                 "  pack-ovp-enable, pack-ovp-protect, pack-ovp-alarm, pack-ovp-recover, pack-ovp-delay\n"
                  "  chg-ocp-enable, chg-ocp-protect, chg-ocp-alarm, chg-ocp-recover, chg-ocp-delay\n"
                  "  dchg-ocp-enable, dchg-ocp-protect, dchg-ocp-alarm, dchg-ocp-recover, dchg-ocp-delay\n"
                  "  scp-enable, scp-threshold, scp-time, scp-delay\n"
@@ -239,16 +239,16 @@ int main(int argc, char* argv[]) {
                           << "cell_ovp_recover_v=" << p.recover_v << "\n"
                           << "cell_ovp_delay_ms="  << p.delay_ms  << "\n";
             }
-            // Cell UVP
+            // Pack OVP
             {
                 CellVoltProtParams p;
-                if (!bms.get_cell_uvp(pack, p, err)) { std::cerr << "cell_uvp: " << err << "\n"; return 1; }
-                std::cout << "cell_uvp_enable="    << b2s(p.enable) << "\n"
+                if (!bms.get_pack_ovp(pack, p, err)) { std::cerr << "pack_ovp: " << err << "\n"; return 1; }
+                std::cout << "pack_ovp_enable="    << b2s(p.enable) << "\n"
                           << std::fixed << std::setprecision(3)
-                          << "cell_uvp_protect_v=" << p.protect_v << "\n"
-                          << "cell_uvp_alarm_v="   << p.alarm_v   << "\n"
-                          << "cell_uvp_recover_v=" << p.recover_v << "\n"
-                          << "cell_uvp_delay_ms="  << p.delay_ms  << "\n";
+                          << "pack_ovp_protect_v=" << p.protect_v << "\n"
+                          << "pack_ovp_alarm_v="   << p.alarm_v   << "\n"
+                          << "pack_ovp_recover_v=" << p.recover_v << "\n"
+                          << "pack_ovp_delay_ms="  << p.delay_ms  << "\n";
             }
             // Charge OCP
             {
@@ -375,7 +375,7 @@ int main(int argc, char* argv[]) {
             }
 
             // Flags tracking which groups have at least one key specified
-            bool has_ovp = false, has_uvp = false;
+            bool has_ovp = false, has_pack_ovp = false;
             bool has_chg_ocp = false, has_dchg_ocp = false;
             bool has_scp = false, has_chg_otp = false;
             bool has_mosfet_otp = false, has_utp = false;
@@ -385,7 +385,7 @@ int main(int argc, char* argv[]) {
             bool has_mos_chg = false, has_mos_dchg = false;
 
             // Parsed values (filled from args, then merged with current if partial)
-            CellVoltProtParams ovp, uvp;
+            CellVoltProtParams ovp, pack_ovp;
             CurrProtParams chg_ocp, dchg_ocp;
             ShortCircuitParams scp;
             CellTempProtParams chg_otp;
@@ -399,7 +399,7 @@ int main(int argc, char* argv[]) {
             // Per-field flags for merge logic
             struct {
                 bool ovp_en=false, ovp_prot=false, ovp_alrm=false, ovp_rec=false, ovp_dly=false;
-                bool uvp_en=false, uvp_prot=false, uvp_alrm=false, uvp_rec=false, uvp_dly=false;
+                bool povp_en=false, povp_prot=false, povp_alrm=false, povp_rec=false, povp_dly=false;
                 bool chg_en=false, chg_prot=false, chg_alrm=false, chg_rec=false, chg_dly=false;
                 bool dchg_en=false, dchg_prot=false, dchg_alrm=false, dchg_rec=false, dchg_dly=false;
                 bool scp_en=false, scp_thr=false, scp_tim=false, scp_dly=false;
@@ -426,12 +426,12 @@ int main(int argc, char* argv[]) {
                 if (!(v=get_kv(arg,"cell-ovp-recover")).empty()) { ovp.recover_v = std::atof(v.c_str());    seen.ovp_rec=true;  has_ovp=true; continue; }
                 if (!(v=get_kv(arg,"cell-ovp-delay")).empty())   { ovp.delay_ms  = std::atoi(v.c_str());    seen.ovp_dly=true;  has_ovp=true; continue; }
 
-                // --- Cell UVP ---
-                if (!(v=get_kv(arg,"cell-uvp-enable")).empty())  { uvp.enable    = std::atoi(v.c_str())!=0; seen.uvp_en=true;   has_uvp=true; continue; }
-                if (!(v=get_kv(arg,"cell-uvp-protect")).empty()) { uvp.protect_v = std::atof(v.c_str());    seen.uvp_prot=true; has_uvp=true; continue; }
-                if (!(v=get_kv(arg,"cell-uvp-alarm")).empty())   { uvp.alarm_v   = std::atof(v.c_str());    seen.uvp_alrm=true; has_uvp=true; continue; }
-                if (!(v=get_kv(arg,"cell-uvp-recover")).empty()) { uvp.recover_v = std::atof(v.c_str());    seen.uvp_rec=true;  has_uvp=true; continue; }
-                if (!(v=get_kv(arg,"cell-uvp-delay")).empty())   { uvp.delay_ms  = std::atoi(v.c_str());    seen.uvp_dly=true;  has_uvp=true; continue; }
+                // --- Pack OVP ---
+                if (!(v=get_kv(arg,"pack-ovp-enable")).empty())  { pack_ovp.enable    = std::atoi(v.c_str())!=0; seen.povp_en=true;   has_pack_ovp=true; continue; }
+                if (!(v=get_kv(arg,"pack-ovp-protect")).empty()) { pack_ovp.protect_v = std::atof(v.c_str());    seen.povp_prot=true; has_pack_ovp=true; continue; }
+                if (!(v=get_kv(arg,"pack-ovp-alarm")).empty())   { pack_ovp.alarm_v   = std::atof(v.c_str());    seen.povp_alrm=true; has_pack_ovp=true; continue; }
+                if (!(v=get_kv(arg,"pack-ovp-recover")).empty()) { pack_ovp.recover_v = std::atof(v.c_str());    seen.povp_rec=true;  has_pack_ovp=true; continue; }
+                if (!(v=get_kv(arg,"pack-ovp-delay")).empty())   { pack_ovp.delay_ms  = std::atoi(v.c_str());    seen.povp_dly=true;  has_pack_ovp=true; continue; }
 
                 // --- Charge OCP ---
                 if (!(v=get_kv(arg,"chg-ocp-enable")).empty())   { chg_ocp.enable    = std::atoi(v.c_str())!=0; seen.chg_en=true;   has_chg_ocp=true; continue; }
@@ -533,17 +533,17 @@ int main(int argc, char* argv[]) {
                 if (!bms.set_cell_ovp(ovp, err)) { std::cerr << "cell_ovp write: " << err << "\n"; return 1; }
             }
 
-            if (has_uvp) {
-                if (!seen.uvp_en || !seen.uvp_prot || !seen.uvp_alrm || !seen.uvp_rec || !seen.uvp_dly) {
+            if (has_pack_ovp) {
+                if (!seen.povp_en || !seen.povp_prot || !seen.povp_alrm || !seen.povp_rec || !seen.povp_dly) {
                     CellVoltProtParams cur;
-                    if (!bms.get_cell_uvp(pack, cur, err)) { std::cerr << "cell_uvp read: " << err << "\n"; return 1; }
-                    if (!seen.uvp_en)   uvp.enable    = cur.enable;
-                    if (!seen.uvp_prot) uvp.protect_v = cur.protect_v;
-                    if (!seen.uvp_alrm) uvp.alarm_v   = cur.alarm_v;
-                    if (!seen.uvp_rec)  uvp.recover_v = cur.recover_v;
-                    if (!seen.uvp_dly)  uvp.delay_ms  = cur.delay_ms;
+                    if (!bms.get_pack_ovp(pack, cur, err)) { std::cerr << "pack_ovp read: " << err << "\n"; return 1; }
+                    if (!seen.povp_en)   pack_ovp.enable    = cur.enable;
+                    if (!seen.povp_prot) pack_ovp.protect_v = cur.protect_v;
+                    if (!seen.povp_alrm) pack_ovp.alarm_v   = cur.alarm_v;
+                    if (!seen.povp_rec)  pack_ovp.recover_v = cur.recover_v;
+                    if (!seen.povp_dly)  pack_ovp.delay_ms  = cur.delay_ms;
                 }
-                if (!bms.set_cell_uvp(uvp, err)) { std::cerr << "cell_uvp write: " << err << "\n"; return 1; }
+                if (!bms.set_pack_ovp(pack_ovp, err)) { std::cerr << "pack_ovp write: " << err << "\n"; return 1; }
             }
 
             if (has_chg_ocp) {
