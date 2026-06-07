@@ -1,5 +1,6 @@
 #include "bms.h"
 #include "serial.h"
+#include "tui.h"
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
@@ -21,6 +22,7 @@ static void usage(const char* prog) {
                  "  alarm\n"
                  "  params get\n"
                  "  params set [key=value ...]\n"
+                 "  tui\n"
                  "\n"
                  "Settable parameter keys (params set):\n"
                  "  cell-ovp-enable, cell-ovp-protect, cell-ovp-alarm, cell-ovp-recover, cell-ovp-delay\n"
@@ -694,6 +696,13 @@ int main(int argc, char* argv[]) {
         }
 
         usage(argv[0]); return 1;
+    }
+
+    // --- tui ---
+    if (subcmd[0] == "tui") {
+        TUI tui(bms, port);
+        tui.run();
+        return 0;
     }
 
     usage(argv[0]);
