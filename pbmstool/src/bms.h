@@ -51,7 +51,7 @@ public:
     bool set_balance(const BalanceParams& p, std::string& err);
 
 private:
-    static constexpr int kRetries = 2;
+    static constexpr int kMaxAttempts = 3;
     bool send_recv(uint8_t adr, uint8_t cmd,
                    const std::vector<uint8_t>& data,
                    Response& resp, std::string& err);

@@ -62,6 +62,10 @@ void Serial::close() {
     if (fd_ >= 0) { ::close(fd_); fd_ = -1; }
 }
 
+void Serial::flush() {
+    if (fd_ >= 0) tcflush(fd_, TCIFLUSH);
+}
+
 bool Serial::write(const std::vector<uint8_t>& data, std::string& err) {
     size_t offset = 0;
     while (offset < data.size()) {

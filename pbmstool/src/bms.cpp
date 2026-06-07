@@ -1,5 +1,4 @@
 #include "bms.h"
-#include <cstring>
 
 namespace pace {
 
@@ -15,15 +14,16 @@ bool BMS::send_recv(uint8_t adr, uint8_t cmd,
                     const std::vector<uint8_t>& data,
                     Response& resp, std::string& err) {
     auto frame = encode_frame(adr, cmd, data);
-    for (int attempt = 0; attempt < kRetries; ++attempt) {
+    for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
+        if (attempt > 0) serial_.flush();
         if (!serial_.write(frame, err)) return false;
         std::vector<uint8_t> raw;
         if (!serial_.read_frame(raw, err)) {
-            if (attempt + 1 < kRetries) continue;
+            if (attempt + 1 < kMaxAttempts) continue;
             return false;
         }
         if (!decode_frame(raw, resp, err)) {
-            if (attempt + 1 < kRetries) continue;
+            if (attempt + 1 < kMaxAttempts) continue;
             return false;
         }
         return true;

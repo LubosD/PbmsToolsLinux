@@ -16,6 +16,7 @@ public:
 
     bool open(const std::string& port, int baud, int timeout_ms);
     void close();
+    void flush();
     bool write(const std::vector<uint8_t>& data, std::string& err);
     bool read_frame(std::vector<uint8_t>& frame, std::string& err);
 private:
