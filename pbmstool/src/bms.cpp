@@ -141,4 +141,36 @@ bool BMS::get_alarm(uint8_t addr, AlarmData& out, std::string& err) {
     return true;
 }
 
+bool BMS::get_balance(BalanceParams& out, std::string& err) {
+    Response resp;
+    if (!send_recv(0x00, CMD_BAL_READ, {}, resp, err)) return false;
+    if (resp.rtn != 0) { err = "BMS error RTN=" + std::to_string(resp.rtn); return false; }
+    if (resp.data.size() < 4) { err = "balance response too short"; return false; }
+    const auto& d = resp.data;
+    uint16_t raw_thresh = static_cast<uint16_t>((d[0] << 8) | d[1]);
+    uint16_t raw_delta  = static_cast<uint16_t>((d[2] << 8) | d[3]);
+    out.threshold_v = raw_thresh / 1000.0;
+    out.delta_mv    = static_cast<int>(raw_delta);
+    return true;
+}
+
+bool BMS::set_balance(const BalanceParams& p, std::string& err) {
+    if (p.threshold_v <= 0.0 || p.delta_mv < 0) {
+        err = "invalid balance params";
+        return false;
+    }
+    uint16_t raw_thresh = static_cast<uint16_t>(static_cast<int>(p.threshold_v * 1000.0 + 0.5));
+    uint16_t raw_delta  = static_cast<uint16_t>(p.delta_mv);
+    std::vector<uint8_t> info = {
+        static_cast<uint8_t>(raw_thresh >> 8),
+        static_cast<uint8_t>(raw_thresh & 0xFF),
+        static_cast<uint8_t>(raw_delta >> 8),
+        static_cast<uint8_t>(raw_delta & 0xFF),
+    };
+    Response resp;
+    if (!send_recv(0x00, CMD_BAL_WRITE, info, resp, err)) return false;
+    if (resp.rtn != 0) { err = "BMS error RTN=" + std::to_string(resp.rtn); return false; }
+    return true;
+}
+
 } // namespace pace
