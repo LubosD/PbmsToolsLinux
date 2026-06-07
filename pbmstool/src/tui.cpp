@@ -1,5 +1,6 @@
 #include "tui.h"
 #include <ncurses.h>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -225,8 +226,99 @@ void TUI::draw_all() {
     refresh();
 }
 
+int TUI::cell_color_pair(uint8_t volt_alarm, bool balancing, attr_t& extra_attr) {
+    extra_attr = A_NORMAL;
+    // Priority: UVP fault > OVP fault > UVP warn > OVP warn > balancing > normal
+    if (volt_alarm & 0x02) { extra_attr = A_BOLD; return CP_UVP_FAULT; }
+    if (volt_alarm & 0x08) { extra_attr = A_BOLD; return CP_OVP_FAULT; }
+    if (volt_alarm & 0x01) { extra_attr = A_BOLD; return CP_UVP_WARN; }
+    if (volt_alarm & 0x04) { return CP_OVP_WARN; }
+    if (balancing)         { return CP_BALANCE; }
+    return CP_NORMAL;
+}
+
 void TUI::draw_analog() {
-    mvprintw(ROW_CONTENT, 2, "[Analog data — not yet implemented]");
+    int row = ROW_CONTENT;
+    int cols = COLS;
+
+    int left_w = cols / 2;
+    int bar_max = left_w - 18;
+    if (bar_max < 4) bar_max = 4;
+
+    // Voltage range for bar scaling (in mV)
+    double v_min = 2500.0, v_max = 4200.0;
+    if (!analog_.cell_mv.empty()) {
+        v_min = *std::min_element(analog_.cell_mv.begin(), analog_.cell_mv.end()) - 50.0;
+        v_max = *std::max_element(analog_.cell_mv.begin(), analog_.cell_mv.end()) + 50.0;
+        if (v_max - v_min < 100.0) { v_min -= 50.0; v_max += 50.0; }
+    }
+
+    mvprintw(row++, 0, "  CELL VOLTAGES");
+
+    for (int k = 0; k < analog_.cell_count && row < LINES - 2; ++k) {
+        double mv = analog_.cell_mv[k];
+        double v  = mv / 1000.0;
+
+        // Balancing from status bytes 5 (cells 1-8) and 6 (cells 9-16)
+        int byte_idx = (k < 8) ? 5 : 6;
+        bool balancing = (alarm_.status[byte_idx] >> (k % 8)) & 1;
+
+        uint8_t va = (k < static_cast<int>(alarm_.cell_volt_alarm.size()))
+                     ? alarm_.cell_volt_alarm[k] : 0;
+
+        attr_t extra;
+        int cp = cell_color_pair(va, balancing, extra);
+
+        attron(COLOR_PAIR(cp) | extra);
+
+        int bar_len = 0;
+        if (v_max > v_min)
+            bar_len = static_cast<int>((mv - v_min) / (v_max - v_min) * bar_max);
+        bar_len = std::max(0, std::min(bar_len, bar_max));
+
+        mvprintw(row, 0, "  #%2d  %5.3fV  ", k + 1, v);
+        for (int b = 0; b < bar_len; ++b) addch(ACS_CKBOARD);
+        for (int b = bar_len; b < bar_max; ++b) addch('.');
+
+        const char* lbl = "";
+        if      (va & 0x02) lbl = " UVP!";
+        else if (va & 0x08) lbl = " OVP!";
+        else if (va & 0x01) lbl = " WARN";
+        else if (va & 0x04) lbl = " WARN";
+        else if (balancing) lbl = " BAL";
+        printw("%s", lbl);
+
+        attroff(COLOR_PAIR(cp) | extra);
+        ++row;
+    }
+
+    // Right column: temperatures and pack stats
+    int col2 = left_w + 2;
+    int rrow = ROW_CONTENT;
+
+    mvprintw(rrow++, col2, "TEMPERATURES");
+    for (int k = 0; k < analog_.temp_count && rrow < LINES - 4; ++k) {
+        double tc = analog_.temp_raw[k] / 10.0 - 273.15;
+        mvprintw(rrow++, col2, "  Sensor %d  %5.1f C", k + 1, tc);
+    }
+
+    ++rrow;
+    mvprintw(rrow++, col2, "PACK");
+    double total_v  = analog_.total_volt_mv / 1000.0;
+    double curr_a   = analog_.current_10ma / 100.0;
+    double remain   = analog_.remain_cap_mah / 1000.0;
+    double full_cap = analog_.full_cap_mah   / 1000.0;
+    int soc = (analog_.full_cap_mah > 0)
+              ? (analog_.remain_cap_mah * 100 / analog_.full_cap_mah) : 0;
+    const char* dir = (curr_a > 0.05)  ? " (charging)"    :
+                      (curr_a < -0.05) ? " (discharging)" : "";
+
+    mvprintw(rrow++, col2, "  Voltage  %6.2f V", total_v);
+    mvprintw(rrow++, col2, "  Current  %+6.2f A%s", curr_a, dir);
+    mvprintw(rrow++, col2, "  Remain   %5.1f Ah", remain);
+    mvprintw(rrow++, col2, "  Full cap %5.1f Ah", full_cap);
+    mvprintw(rrow++, col2, "  SOC      %3d%%", soc);
+    mvprintw(rrow++, col2, "  Cycles   %d", static_cast<int>(analog_.cycle));
 }
 void TUI::draw_alarms() {
     mvprintw(ROW_CONTENT, 2, "[Alarm data — not yet implemented]");

@@ -1,5 +1,6 @@
 #pragma once
 #include "bms.h"
+#include <ncurses.h>
 #include <chrono>
 #include <string>
 #include <vector>
@@ -108,6 +109,8 @@ private:
 
     int  content_rows() const;
     int  content_cols() const;
+
+    static int cell_color_pair(uint8_t volt_alarm, bool balancing, attr_t& extra_attr);
 };
 
 } // namespace pace
