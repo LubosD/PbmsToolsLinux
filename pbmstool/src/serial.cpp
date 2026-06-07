@@ -21,12 +21,16 @@ static speed_t to_baud(int baud) {
 }
 
 bool Serial::open(const std::string& port, int baud, int timeout_ms) {
+    if (fd_ >= 0) close();
+
     fd_ = ::open(port.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd_ < 0) return false;
 
     // Switch to blocking with VTIME timeout
     int flags = fcntl(fd_, F_GETFL, 0);
-    fcntl(fd_, F_SETFL, flags & ~O_NONBLOCK);
+    if (flags < 0 || fcntl(fd_, F_SETFL, flags & ~O_NONBLOCK) < 0) {
+        ::close(fd_); fd_ = -1; return false;
+    }
 
     struct termios tty {};
     if (tcgetattr(fd_, &tty) != 0) { ::close(fd_); fd_ = -1; return false; }
@@ -59,10 +63,11 @@ void Serial::close() {
 }
 
 bool Serial::write(const std::vector<uint8_t>& data, std::string& err) {
-    ssize_t n = ::write(fd_, data.data(), data.size());
-    if (n < 0 || static_cast<size_t>(n) != data.size()) {
-        err = std::strerror(errno);
-        return false;
+    size_t offset = 0;
+    while (offset < data.size()) {
+        ssize_t n = ::write(fd_, data.data() + offset, data.size() - offset);
+        if (n < 0) { err = std::strerror(errno); return false; }
+        offset += static_cast<size_t>(n);
     }
     return true;
 }
@@ -70,12 +75,15 @@ bool Serial::write(const std::vector<uint8_t>& data, std::string& err) {
 bool Serial::read_frame(std::vector<uint8_t>& frame, std::string& err) {
     frame.clear();
     uint8_t byte;
-    // Wait for start byte 0x7E
-    while (true) {
+    // Sync to start byte 0x7E (cap at 4096 bytes to avoid infinite loop on line noise)
+    for (int sync = 0; sync < 4096; ++sync) {
         ssize_t n = ::read(fd_, &byte, 1);
         if (n <= 0) { err = (n == 0) ? "timeout" : std::strerror(errno); return false; }
-        if (byte == 0x7E) { frame.push_back(byte); break; }
+        if (byte == 0x7E) { frame.push_back(byte); goto found_start; }
     }
+    err = "start byte not found";
+    return false;
+found_start:
     // Read until 0x0D end byte
     for (int i = 0; i < 2048; ++i) {
         ssize_t n = ::read(fd_, &byte, 1);
