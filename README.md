@@ -2,6 +2,8 @@
 
 A Linux command-line tool for communicating with **Pace BMS** hardware over a serial port. Reverse-engineered from `PbmsTools V2.5` (the original Windows GUI).
 
+The focus is on battery health and balancing control.
+
 ## Building
 
 Requires CMake ≥ 3.14 and a C++17 compiler. No external dependencies.
