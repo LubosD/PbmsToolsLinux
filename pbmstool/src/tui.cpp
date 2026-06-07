@@ -88,7 +88,15 @@ void TUI::run() {
 
         if (ch == 'q' || ch == 'Q') break;
 
-        if (ch == KEY_F(1)) { current_tab_ = 0; param_cursor_ = 0; edit_mode_ = false; }
+        if (ch == KEY_F(1)) {
+            current_tab_ = 0;
+            // Reset param cursor to first editable row
+            param_cursor_ = 0;
+            while (param_cursor_ < static_cast<int>(param_rows_.size()) &&
+                   param_rows_[param_cursor_].kind == ParamRow::Kind::HEADING)
+                ++param_cursor_;
+            edit_mode_ = false;
+        }
         else if (ch == KEY_F(2)) { current_tab_ = 1; edit_mode_ = false; }
         else if (ch == KEY_F(3)) { current_tab_ = 2; edit_mode_ = false; }
         else if ((ch == '[' || ch == '<') && !edit_mode_) switch_pack(-1);
@@ -127,7 +135,7 @@ void TUI::switch_pack(int) {}
 void TUI::handle_params_key(int) {}
 void TUI::build_param_rows() {}
 
-int TUI::content_rows() const { return LINES - 4; }
+int TUI::content_rows() const { return LINES - ROW_CONTENT - 1; }
 int TUI::content_cols() const { return COLS; }
 
 } // namespace pace
