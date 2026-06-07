@@ -479,11 +479,18 @@ void TUI::draw_params() {
             }
         }
 
-        if (is_cursor) attroff(COLOR_PAIR(CP_SELECTED));
-
-        if (row_dirty && !is_editing) attron(COLOR_PAIR(CP_OVP_WARN));
+        // Print value — if dirty and not currently selected or editing, highlight yellow
+        bool show_dirty = row_dirty && !is_cursor && !is_editing;
+        if (show_dirty) {
+            if (is_cursor) attroff(COLOR_PAIR(CP_SELECTED));
+            attron(COLOR_PAIR(CP_OVP_WARN));
+        }
         mvprintw(row, 18, "%-12s %s", val_str.c_str(), pr.unit.c_str());
-        if (row_dirty && !is_editing) attroff(COLOR_PAIR(CP_OVP_WARN));
+        if (show_dirty) {
+            attroff(COLOR_PAIR(CP_OVP_WARN));
+        } else if (is_cursor) {
+            attroff(COLOR_PAIR(CP_SELECTED));
+        }
     }
 }
 
