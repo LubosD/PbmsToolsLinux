@@ -118,14 +118,122 @@ void TUI::run() {
     endwin();
 }
 
-void TUI::draw_all()     {}
-void TUI::draw_header()  {}
-void TUI::draw_tabs()    {}
-void TUI::draw_content() {}
-void TUI::draw_analog()  {}
-void TUI::draw_alarms()  {}
-void TUI::draw_params()  {}
-void TUI::draw_footer()  {}
+void TUI::draw_header() {
+    int cols = COLS;
+    attron(COLOR_PAIR(CP_HEADER));
+    mvhline(ROW_HEADER, 0, ' ', cols);
+
+    // Left: "pbmstool  <port>"
+    mvprintw(ROW_HEADER, 1, "pbmstool  %s", port_.c_str());
+
+    // Center: pack switcher
+    std::string pack_str;
+    if (pack_count_ > 1) {
+        pack_str = "Pack [< " + std::to_string(current_pack_) + " >] /"
+                 + std::to_string(pack_count_);
+    } else {
+        pack_str = "Pack " + std::to_string(current_pack_);
+    }
+    int cx = (cols - static_cast<int>(pack_str.size())) / 2;
+    if (cx > 0) mvprintw(ROW_HEADER, cx, "%s", pack_str.c_str());
+
+    // Right: refresh indicator + quit hint
+    const char* ref_lbl = auto_refresh_ ? "ON " : "OFF";
+    std::string right = std::string("refresh:") + ref_lbl + "  [r] [q:quit]";
+    int rx = cols - static_cast<int>(right.size()) - 1;
+    if (rx > 0) mvprintw(ROW_HEADER, rx, "%s", right.c_str());
+
+    attroff(COLOR_PAIR(CP_HEADER));
+
+    // Re-color the ON/OFF indicator
+    if (has_colors() && rx > 0) {
+        int on_col = rx + 8; // after "refresh:"
+        if (auto_refresh_) {
+            mvchgat(ROW_HEADER, on_col, 3, A_BOLD, CP_OK, nullptr);
+        } else {
+            mvchgat(ROW_HEADER, on_col, 3, A_DIM,  CP_HEADER, nullptr);
+        }
+    }
+}
+
+void TUI::draw_tabs() {
+    static const char* labels[] = { " F1:Analog ", " F2:Alarms ", " F3:Params " };
+    move(ROW_TABBAR, 0);
+    clrtoeol();
+
+    int col = 0;
+    for (int t = 0; t < 3; ++t) {
+        if (t == current_tab_) {
+            attron(COLOR_PAIR(CP_TAB_ACTIVE) | A_BOLD);
+            mvprintw(ROW_TABBAR, col, "%s", labels[t]);
+            attroff(COLOR_PAIR(CP_TAB_ACTIVE) | A_BOLD);
+        } else {
+            attron(COLOR_PAIR(CP_NORMAL));
+            mvprintw(ROW_TABBAR, col, "%s", labels[t]);
+            attroff(COLOR_PAIR(CP_NORMAL));
+        }
+        col += static_cast<int>(strlen(labels[t]));
+        mvaddch(ROW_TABBAR, col, ACS_VLINE);
+        col += 1;
+    }
+    mvhline(ROW_TABBAR, col, ACS_HLINE, COLS - col);
+}
+
+void TUI::draw_footer() {
+    int row = LINES - 1;
+    move(row, 0);
+    clrtoeol();
+
+    if (!footer_msg_.empty()) {
+        attron(A_BOLD);
+        mvprintw(row, 0, "%s", footer_msg_.c_str());
+        attroff(A_BOLD);
+        return;
+    }
+
+    if (current_tab_ != 2) {
+        auto now = std::chrono::steady_clock::now();
+        double secs = std::chrono::duration<double>(now - last_refresh_).count();
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Last update: %.1fs ago", secs);
+        mvprintw(row, 0, "%s", buf);
+    } else {
+        mvprintw(row, 0, "%-*s",
+            COLS - 1,
+            "↑↓ navigate  digits: edit  Space: toggle  s: save  Esc: revert");
+    }
+}
+
+void TUI::draw_content() {
+    for (int r = ROW_CONTENT; r < LINES - 1; ++r) {
+        move(r, 0);
+        clrtoeol();
+    }
+    switch (current_tab_) {
+        case 0: draw_analog(); break;
+        case 1: draw_alarms(); break;
+        case 2: draw_params(); break;
+    }
+}
+
+void TUI::draw_all() {
+    erase();
+    draw_header();
+    draw_tabs();
+    draw_content();
+    draw_footer();
+    refresh();
+}
+
+void TUI::draw_analog() {
+    mvprintw(ROW_CONTENT, 2, "[Analog data — not yet implemented]");
+}
+void TUI::draw_alarms() {
+    mvprintw(ROW_CONTENT, 2, "[Alarm data — not yet implemented]");
+}
+void TUI::draw_params() {
+    mvprintw(ROW_CONTENT, 2, "[Parameters — not yet implemented]");
+}
 
 void TUI::refresh_live_data() {}
 bool TUI::load_params(std::string&) { return true; }
