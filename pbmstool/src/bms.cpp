@@ -80,7 +80,7 @@ bool BMS::get_analog(uint8_t addr, AnalogData& out, std::string& err) {
     }
 
     out.temp_count = d[i++];
-    if (d.size() < i + static_cast<size_t>(out.temp_count) * 2 + 8)
+    if (d.size() < i + static_cast<size_t>(out.temp_count) * 2 + 11)
         { err = "analog response truncated (temps)"; return false; }
 
     out.temp_raw.resize(out.temp_count);
@@ -89,7 +89,7 @@ bool BMS::get_analog(uint8_t addr, AnalogData& out, std::string& err) {
         i += 2;
     }
 
-    out.current_10ma  = static_cast<int16_t>((d[i] << 8) | d[i+1]); i += 2;
+    out.current_10ma  = static_cast<int16_t>(static_cast<uint16_t>((d[i] << 8) | d[i+1])); i += 2;
     out.total_volt_mv = static_cast<uint16_t>((d[i] << 8) | d[i+1]); i += 2;
     uint16_t rem_raw  = static_cast<uint16_t>((d[i] << 8) | d[i+1]); i += 2;
     out.remain_cap_mah = static_cast<int>(rem_raw) * 10;
