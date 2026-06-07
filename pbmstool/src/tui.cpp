@@ -108,6 +108,11 @@ void TUI::run() {
         else if (ch == ERR) {
             // timeout fired — auto refresh
             if (auto_refresh_ && current_tab_ != 2) refresh_live_data();
+            // retry params load if it previously failed (no edits can exist when stale)
+            if (current_tab_ == 2 && params_stale_) {
+                std::string err;
+                load_params(err);
+            }
         }
         else {
             if (current_tab_ == 2) handle_params_key(ch);
@@ -238,6 +243,14 @@ int TUI::cell_color_pair(uint8_t volt_alarm, bool balancing, attr_t& extra_attr)
 }
 
 void TUI::draw_analog() {
+    if (data_stale_) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Fetching data for pack %d...", current_pack_);
+        attron(COLOR_PAIR(CP_OVP_WARN) | A_BOLD);
+        mvprintw(ROW_CONTENT + content_rows() / 2, (COLS - static_cast<int>(strlen(buf))) / 2, "%s", buf);
+        attroff(COLOR_PAIR(CP_OVP_WARN) | A_BOLD);
+        return;
+    }
     int row = ROW_CONTENT;
     int cols = COLS;
 
@@ -321,6 +334,14 @@ void TUI::draw_analog() {
     mvprintw(rrow++, col2, "  Cycles   %d", static_cast<int>(analog_.cycle));
 }
 void TUI::draw_alarms() {
+    if (data_stale_) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Fetching data for pack %d...", current_pack_);
+        attron(COLOR_PAIR(CP_OVP_WARN) | A_BOLD);
+        mvprintw(ROW_CONTENT + content_rows() / 2, (COLS - static_cast<int>(strlen(buf))) / 2, "%s", buf);
+        attroff(COLOR_PAIR(CP_OVP_WARN) | A_BOLD);
+        return;
+    }
     int row = ROW_CONTENT;
     int cols = COLS;
     int col2 = cols / 2;
@@ -418,8 +439,12 @@ void TUI::draw_alarms() {
     if (rrow < LINES - 2) print_status(rrow++, col2, "Sampling",      !(s4 & 0x20));
 }
 void TUI::draw_params() {
-    if (param_rows_.empty()) {
-        mvprintw(ROW_CONTENT, 2, "Loading parameters...");
+    if (params_stale_ || param_rows_.empty()) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Fetching params for pack %d...", current_pack_);
+        attron(COLOR_PAIR(CP_OVP_WARN) | A_BOLD);
+        mvprintw(ROW_CONTENT + content_rows() / 2, (COLS - static_cast<int>(strlen(buf))) / 2, "%s", buf);
+        attroff(COLOR_PAIR(CP_OVP_WARN) | A_BOLD);
         return;
     }
 
@@ -497,10 +522,14 @@ void TUI::refresh_live_data() {
     std::string err;
     bool ok = bms_.get_analog(static_cast<uint8_t>(current_pack_), analog_, err);
     ok = bms_.get_alarm(static_cast<uint8_t>(current_pack_), alarm_, err) && ok;
-    if (ok)
+    if (ok) {
         last_refresh_ = std::chrono::steady_clock::now();
-    else if (!err.empty())
-        footer_msg_ = err;
+        data_stale_ = false;
+        footer_msg_.clear();
+    } else {
+        data_stale_ = true;
+        if (!err.empty()) footer_msg_ = err;
+    }
 }
 bool TUI::load_params(std::string& err) {
     uint8_t addr = static_cast<uint8_t>(current_pack_);
@@ -522,6 +551,7 @@ bool TUI::load_params(std::string& err) {
 
     params_orig_ = params_;
     dirty_.clear();
+    params_stale_ = false;
     build_param_rows();
     return true;
 }
@@ -563,6 +593,11 @@ void TUI::switch_pack(int delta) {
     if (next < 1) next = pack_count_;
     if (next > pack_count_) next = 1;
     current_pack_ = next;
+
+    data_stale_   = true;
+    params_stale_ = true;
+    last_refresh_ = std::chrono::steady_clock::now();
+    footer_msg_.clear();
 
     std::string err;
     refresh_live_data();

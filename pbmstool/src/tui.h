@@ -89,6 +89,10 @@ private:
     std::string footer_msg_;
     std::chrono::steady_clock::time_point last_refresh_;
 
+    // Set true after a pack switch until live data / params arrive successfully
+    bool data_stale_   = true;
+    bool params_stale_ = true;
+
     void init_ncurses();
     void draw_all();
     void draw_header();
