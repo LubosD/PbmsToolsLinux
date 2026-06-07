@@ -6,6 +6,8 @@ namespace pace {
 namespace {
 
 std::string lchksum(int ascii_len) {
+    // ascii_len is limited to 12 bits (max 4095 ASCII chars = 2047 data bytes)
+    if (ascii_len > 0x0FFF) ascii_len = 0x0FFF; // clamp; BMS commands never approach this limit
     int nibble_sum = (ascii_len & 0x0F)
                    + ((ascii_len & 0xF0) >> 4)
                    + ((ascii_len & 0xF00) >> 8);
@@ -73,22 +75,37 @@ bool decode_frame(const std::vector<uint8_t>& raw, Response& out, std::string& e
         if (actual != exp_hex) { err = "checksum mismatch"; return false; }
     }
 
+    auto parse_hex_byte = [&](const char* s) -> int {
+        try { return static_cast<int>(std::stoul(s, nullptr, 16)); }
+        catch (...) { return -1; }
+    };
+
     // ADR at [3..4]
     char adr_str[3] = { static_cast<char>(raw[3]), static_cast<char>(raw[4]), 0 };
-    out.adr = static_cast<uint8_t>(std::stoul(adr_str, nullptr, 16));
+    int adr_val = parse_hex_byte(adr_str);
+    if (adr_val < 0) { err = "invalid ADR field"; return false; }
+    out.adr = static_cast<uint8_t>(adr_val);
 
     // RTN at [7..8]
     char rtn_str[3] = { static_cast<char>(raw[7]), static_cast<char>(raw[8]), 0 };
-    out.rtn = static_cast<uint8_t>(std::stoul(rtn_str, nullptr, 16));
+    int rtn_val = parse_hex_byte(rtn_str);
+    if (rtn_val < 0) { err = "invalid RTN field"; return false; }
+    out.rtn = static_cast<uint8_t>(rtn_val);
 
     // DATA: ASCII hex at [13 .. size-6], decode to bytes
     if (raw.size() > 18) {
         size_t data_ascii_len = raw.size() - 18;
+        if (data_ascii_len % 2 != 0) {
+            err = "odd data field length";
+            return false;
+        }
         out.data.resize(data_ascii_len / 2);
         for (size_t i = 0; i < out.data.size(); ++i) {
             char nibbles[3] = { static_cast<char>(raw[13 + 2*i]),
                                 static_cast<char>(raw[13 + 2*i + 1]), 0 };
-            out.data[i] = static_cast<uint8_t>(std::stoul(nibbles, nullptr, 16));
+            int val = parse_hex_byte(nibbles);
+            if (val < 0) { err = "invalid DATA field at byte " + std::to_string(i); return false; }
+            out.data[i] = static_cast<uint8_t>(val);
         }
     }
 
