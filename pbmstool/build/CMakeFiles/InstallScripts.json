@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/lubos/Projects/PbmsTools/pbmstool/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

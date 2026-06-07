@@ -1,0 +1,3 @@
+/home/lubos/Projects/PbmsTools/pbmstool/build/CMakeFiles/pbmstool.dir
+/home/lubos/Projects/PbmsTools/pbmstool/build/CMakeFiles/edit_cache.dir
+/home/lubos/Projects/PbmsTools/pbmstool/build/CMakeFiles/rebuild_cache.dir
