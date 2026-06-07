@@ -4,7 +4,8 @@
 namespace pace {
 
 TUI::TUI(BMS& bms, const std::string& port)
-    : bms_(bms), port_(port) {}
+    : bms_(bms), port_(port),
+      last_refresh_(std::chrono::steady_clock::now()) {}
 
 TUI::~TUI() {
     if (isendwin() == FALSE) endwin();
