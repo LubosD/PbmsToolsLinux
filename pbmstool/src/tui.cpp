@@ -66,18 +66,8 @@ void TUI::run() {
         pack_count_ = (n > 0) ? n : 1;
     }
 
-    // Initial data load
+    // Initial data load — params are loaded lazily when user opens F3 tab
     refresh_live_data();
-    {
-        std::string err;
-        load_params(err);
-    }
-
-    // Position cursor on first editable row
-    param_cursor_ = 0;
-    while (param_cursor_ < static_cast<int>(param_rows_.size()) &&
-           param_rows_[param_cursor_].kind == ParamRow::Kind::HEADING)
-        ++param_cursor_;
 
     draw_all();
 
@@ -99,7 +89,19 @@ void TUI::run() {
             edit_mode_ = false;
         }
         else if (ch == KEY_F(2)) { current_tab_ = 1; edit_mode_ = false; }
-        else if (ch == KEY_F(3)) { current_tab_ = 2; edit_mode_ = false; }
+        else if (ch == KEY_F(3)) {
+            current_tab_ = 2;
+            edit_mode_ = false;
+            if (params_stale_) {
+                std::string err;
+                load_params(err);
+                // advance cursor past heading rows
+                param_cursor_ = 0;
+                while (param_cursor_ < static_cast<int>(param_rows_.size()) &&
+                       param_rows_[param_cursor_].kind == ParamRow::Kind::HEADING)
+                    ++param_cursor_;
+            }
+        }
         else if ((ch == '[' || ch == '<') && !edit_mode_) switch_pack(-1);
         else if ((ch == ']' || ch == '>') && !edit_mode_) switch_pack(+1);
         else if (ch == 'r' || ch == 'R') {
@@ -599,19 +601,9 @@ void TUI::switch_pack(int delta) {
     last_refresh_ = std::chrono::steady_clock::now();
     footer_msg_.clear();
 
-    std::string err;
     refresh_live_data();
-    bool ok = load_params(err);
-    param_cursor_ = 0;
-    // Advance past heading rows
-    while (param_cursor_ < static_cast<int>(param_rows_.size()) &&
-           param_rows_[param_cursor_].kind == ParamRow::Kind::HEADING)
-        ++param_cursor_;
+    // params loaded lazily when user opens F3 tab
     edit_mode_ = false;
-    if (ok)
-        footer_msg_.clear();
-    else
-        footer_msg_ = err;
 }
 void TUI::handle_params_key(int ch) {
     if (param_rows_.empty()) return;
