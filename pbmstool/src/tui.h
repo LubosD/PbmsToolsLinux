@@ -2,6 +2,7 @@
 #include "bms.h"
 #include <chrono>
 #include <string>
+#include <vector>
 
 namespace pace {
 
@@ -42,6 +43,20 @@ struct DirtyFlags {
     void clear() { *this = DirtyFlags{}; }
 };
 
+// A single editable row in the params tab.
+struct ParamRow {
+    enum class Kind { BOOL, DOUBLE, INT, HEADING };
+    Kind        kind;
+    std::string label;
+    std::string unit;
+    // Pointers into AllParams current_ fields (null for HEADING rows)
+    bool*   bval = nullptr;
+    double* dval = nullptr;
+    int*    ival = nullptr;
+    int     group_id = -1;  // maps to DirtyFlags field; -1 = not editable
+    double  precision = 3;  // decimal places for display of doubles
+};
+
 class TUI {
 public:
     TUI(BMS& bms, const std::string& port);
@@ -64,8 +79,10 @@ private:
 
     // Params tab cursor & editing
     int         param_cursor_  = 0;
+    int         param_scroll_  = 0;
     bool        edit_mode_     = false;
     std::string edit_buf_;
+    std::vector<ParamRow> param_rows_;
 
     // Footer message and last-refresh timestamp
     std::string footer_msg_;
@@ -87,6 +104,7 @@ private:
     void revert_params();
     void switch_pack(int delta);
     void handle_params_key(int ch);
+    void build_param_rows();
 
     int  content_rows() const;
     int  content_cols() const;
