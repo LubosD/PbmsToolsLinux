@@ -299,7 +299,7 @@ void TUI::draw_analog() {
     mvprintw(rrow++, col2, "TEMPERATURES");
     for (int k = 0; k < analog_.temp_count && rrow < LINES - 4; ++k) {
         double tc = analog_.temp_raw[k] / 10.0 - 273.15;
-        mvprintw(rrow++, col2, "  Sensor %d  %5.1f C", k + 1, tc);
+        mvprintw(rrow++, col2, "  Sensor %d  %5.1f\xc2\xb0""C", k + 1, tc);
     }
 
     ++rrow;
