@@ -525,8 +525,32 @@ bool TUI::load_params(std::string& err) {
     build_param_rows();
     return true;
 }
-bool TUI::save_dirty_params(std::string&) { return true; }
-void TUI::revert_params() {}
+bool TUI::save_dirty_params(std::string& err) {
+    AllParams& p = params_;
+    if (dirty_.cell_ovp    && !bms_.set_cell_ovp(p.cell_ovp, err))           return false;
+    if (dirty_.pack_ovp    && !bms_.set_pack_ovp(p.pack_ovp, err))           return false;
+    if (dirty_.chg_ocp     && !bms_.set_chg_ocp(p.chg_ocp, err))            return false;
+    if (dirty_.dchg_ocp    && !bms_.set_dchg_ocp(p.dchg_ocp, err))          return false;
+    if (dirty_.scp         && !bms_.set_scp(p.scp, err))                    return false;
+    if (dirty_.chg_otp     && !bms_.set_cell_chg_otp(p.chg_otp, err))       return false;
+    if (dirty_.mosfet_otp  && !bms_.set_mosfet_otp(p.mosfet_otp, err))      return false;
+    if (dirty_.utp         && !bms_.set_utp(p.utp, err))                    return false;
+    if (dirty_.balance     && !bms_.set_balance(p.balance, err))             return false;
+    if (dirty_.pack_b      && !bms_.set_pack_b(p.pack_b, err))              return false;
+    if (dirty_.equalization && !bms_.set_equalization(p.equalization, err))  return false;
+    if (dirty_.chg_temp    && !bms_.set_chg_temp_prot(p.chg_temp, err))     return false;
+    if (dirty_.dchg_temp   && !bms_.set_dchg_temp_prot(p.dchg_temp, err))   return false;
+    if (dirty_.mos_chg_temp  && p.mos_chg_temp.present  &&
+        !bms_.set_mos_chg_temp(p.mos_chg_temp, err))                        return false;
+    if (dirty_.mos_dchg_temp && p.mos_dchg_temp.present &&
+        !bms_.set_mos_dchg_temp(p.mos_dchg_temp, err))                      return false;
+    return true;
+}
+void TUI::revert_params() {
+    params_ = params_orig_;
+    dirty_.clear();
+    build_param_rows();  // REQUIRED: rebuilds pointers into refreshed params_
+}
 void TUI::switch_pack(int delta) {
     if (pack_count_ <= 1) return;
 
@@ -552,7 +576,118 @@ void TUI::switch_pack(int delta) {
     edit_mode_ = false;
     footer_msg_.clear();
 }
-void TUI::handle_params_key(int) {}
+void TUI::handle_params_key(int ch) {
+    if (param_rows_.empty()) return;
+
+    // Skip heading rows when moving cursor
+    auto next_editable = [&](int from, int dir) -> int {
+        int n = static_cast<int>(param_rows_.size());
+        int idx = from + dir;
+        while (idx >= 0 && idx < n && param_rows_[idx].kind == ParamRow::Kind::HEADING)
+            idx += dir;
+        if (idx < 0 || idx >= n) return from;
+        return idx;
+    };
+
+    if (edit_mode_) {
+        // ── In edit mode ──
+        if (ch == 27) {  // Esc — cancel edit
+            edit_mode_ = false;
+            edit_buf_.clear();
+            return;
+        }
+        if (ch == '\n' || ch == KEY_ENTER || ch == KEY_UP || ch == KEY_DOWN) {
+            // Commit the edit
+            const ParamRow& pr = param_rows_[param_cursor_];
+            if (!edit_buf_.empty()) {
+                if (pr.kind == ParamRow::Kind::DOUBLE) {
+                    try { *pr.dval = std::stod(edit_buf_); } catch (...) {}
+                } else if (pr.kind == ParamRow::Kind::INT) {
+                    try { *pr.ival = std::stoi(edit_buf_); } catch (...) {}
+                }
+                // Mark group dirty
+                mark_dirty(pr.group_id);
+            }
+            edit_mode_ = false;
+            edit_buf_.clear();
+            // Move cursor if arrow was pressed
+            if (ch == KEY_UP)   param_cursor_ = next_editable(param_cursor_, -1);
+            if (ch == KEY_DOWN) param_cursor_ = next_editable(param_cursor_, +1);
+            return;
+        }
+        if (ch == KEY_BACKSPACE || ch == 127) {
+            if (!edit_buf_.empty()) edit_buf_.pop_back();
+            return;
+        }
+        if (isdigit(ch) || ch == '.' || ch == '-') {
+            edit_buf_ += static_cast<char>(ch);
+        }
+        return;
+    }
+
+    // ── Normal (non-edit) mode ──
+    if (ch == KEY_UP)   { param_cursor_ = next_editable(param_cursor_, -1); footer_msg_.clear(); return; }
+    if (ch == KEY_DOWN) { param_cursor_ = next_editable(param_cursor_, +1); footer_msg_.clear(); return; }
+    if (ch == KEY_PPAGE) {
+        for (int i = 0; i < content_rows() / 2; ++i)
+            param_cursor_ = next_editable(param_cursor_, -1);
+        return;
+    }
+    if (ch == KEY_NPAGE) {
+        for (int i = 0; i < content_rows() / 2; ++i)
+            param_cursor_ = next_editable(param_cursor_, +1);
+        return;
+    }
+
+    const ParamRow& pr = param_rows_[param_cursor_];
+
+    if (ch == ' ' && pr.kind == ParamRow::Kind::BOOL) {
+        *pr.bval = !(*pr.bval);
+        mark_dirty(pr.group_id);
+        return;
+    }
+
+    if ((isdigit(ch) || ch == '.' || ch == '-') &&
+        (pr.kind == ParamRow::Kind::DOUBLE || pr.kind == ParamRow::Kind::INT)) {
+        edit_mode_ = true;
+        edit_buf_.clear();
+        edit_buf_ += static_cast<char>(ch);
+        return;
+    }
+
+    if (ch == 's' || ch == 'S') {
+        if (dirty_.any()) {
+            std::string err;
+            footer_msg_ = "Saving...";
+            draw_footer();
+            ::refresh();
+            if (save_dirty_params(err)) {
+                footer_msg_ = "Saved.";
+                params_orig_ = params_;
+                dirty_.clear();
+            } else {
+                footer_msg_ = "Save error: " + err;
+            }
+        }
+        return;
+    }
+
+    if (ch == 27) {  // Esc — revert
+        revert_params();
+        footer_msg_ = "Reverted.";
+        return;
+    }
+}
+void TUI::mark_dirty(int group_id) {
+    bool* flags[] = {
+        &dirty_.cell_ovp, &dirty_.pack_ovp, &dirty_.chg_ocp, &dirty_.dchg_ocp,
+        &dirty_.scp, &dirty_.chg_otp, &dirty_.mosfet_otp, &dirty_.utp,
+        &dirty_.balance, &dirty_.pack_b, &dirty_.equalization,
+        &dirty_.chg_temp, &dirty_.dchg_temp, &dirty_.mos_chg_temp, &dirty_.mos_dchg_temp
+    };
+    if (group_id >= 0 && group_id < static_cast<int>(std::size(flags)))
+        *flags[group_id] = true;
+}
 void TUI::build_param_rows() {
     param_rows_.clear();
     auto& p = params_;  // current values
