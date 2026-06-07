@@ -633,11 +633,13 @@ void TUI::handle_params_key(int ch) {
     if (ch == KEY_PPAGE) {
         for (int i = 0; i < content_rows() / 2; ++i)
             param_cursor_ = next_editable(param_cursor_, -1);
+        footer_msg_.clear();
         return;
     }
     if (ch == KEY_NPAGE) {
         for (int i = 0; i < content_rows() / 2; ++i)
             param_cursor_ = next_editable(param_cursor_, +1);
+        footer_msg_.clear();
         return;
     }
 
