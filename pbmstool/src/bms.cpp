@@ -94,9 +94,9 @@ bool BMS::get_analog(uint8_t addr, AnalogData& out, std::string& err) {
     out.total_volt_mv = static_cast<uint16_t>((d[i] << 8) | d[i+1]); i += 2;
     uint16_t rem_raw  = static_cast<uint16_t>((d[i] << 8) | d[i+1]); i += 2;
     out.remain_cap_mah = static_cast<int>(rem_raw) * 10;
+    ++i;  // skip custom number byte (between remain and full cap)
     uint16_t full_raw  = static_cast<uint16_t>((d[i] << 8) | d[i+1]); i += 2;
     out.full_cap_mah   = static_cast<int>(full_raw) * 10;
-    ++i;  // skip custom number byte
     out.cycle          = static_cast<uint16_t>((d[i] << 8) | d[i+1]); i += 2;
     if (i + 1 < d.size()) {
         uint16_t des_raw   = static_cast<uint16_t>((d[i] << 8) | d[i+1]);
