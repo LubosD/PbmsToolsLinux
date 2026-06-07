@@ -61,7 +61,7 @@ bool BMS::get_version(uint8_t addr, std::string& version, std::string& err) {
 
 bool BMS::get_analog(uint8_t addr, AnalogData& out, std::string& err) {
     Response resp;
-    if (!send_recv(addr, CMD_ANALOG, {}, resp, err)) return false;
+    if (!send_recv(addr, CMD_ANALOG, {addr}, resp, err)) return false;
     if (resp.rtn != 0) { err = "BMS error RTN=" + std::to_string(resp.rtn); return false; }
 
     const auto& d = resp.data;
@@ -108,7 +108,7 @@ bool BMS::get_analog(uint8_t addr, AnalogData& out, std::string& err) {
 
 bool BMS::get_alarm(uint8_t addr, AlarmData& out, std::string& err) {
     Response resp;
-    if (!send_recv(addr, CMD_ALARM, {}, resp, err)) return false;
+    if (!send_recv(addr, CMD_ALARM, {addr}, resp, err)) return false;
     if (resp.rtn != 0) { err = "BMS error RTN=" + std::to_string(resp.rtn); return false; }
 
     const auto& d = resp.data;
