@@ -124,6 +124,7 @@ bool BMS::get_alarm(uint8_t addr, AlarmData& out, std::string& err) {
 
     out.temp_count = d[i++];
     if (out.temp_count > 16) { err = "temp count > 16"; return false; }
+    // 12 = 3 state bytes (charge/total/discharge) + 9 status bytes
     if (d.size() < i + static_cast<size_t>(out.temp_count) + 12)
         { err = "alarm response truncated (temps)"; return false; }
 
@@ -134,7 +135,7 @@ bool BMS::get_alarm(uint8_t addr, AlarmData& out, std::string& err) {
     out.total_volt_state     = d[i++];
     out.discharge_curr_state = d[i++];
 
-    for (int k = 0; k < 9 && i < d.size(); ++k)
+    for (int k = 0; k < 9; ++k)
         out.status[k] = d[i++];
 
     return true;
