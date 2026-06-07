@@ -566,15 +566,17 @@ void TUI::switch_pack(int delta) {
 
     std::string err;
     refresh_live_data();
-    if (!load_params(err))
-        footer_msg_ = err;
+    bool ok = load_params(err);
     param_cursor_ = 0;
     // Advance past heading rows
     while (param_cursor_ < static_cast<int>(param_rows_.size()) &&
            param_rows_[param_cursor_].kind == ParamRow::Kind::HEADING)
         ++param_cursor_;
     edit_mode_ = false;
-    footer_msg_.clear();
+    if (ok)
+        footer_msg_.clear();
+    else
+        footer_msg_ = err;
 }
 void TUI::handle_params_key(int ch) {
     if (param_rows_.empty()) return;
