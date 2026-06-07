@@ -373,10 +373,12 @@ void TUI::draw_alarms() {
     print_status(row++, 0, "Chg OCP",       !(s0 & 0x10));
     print_status(row++, 0, "Dchg OCP",      !(s0 & 0x20));
     print_status(row++, 0, "Short circuit", !(s0 & 0x40));
+    print_status(row++, 0, "Chg Overvolt",  !(s0 & 0x80));
     print_status(row++, 0, "Chg OTP",       !(s1 & 0x01));
     print_status(row++, 0, "Dchg OTP",      !(s1 & 0x04));
     print_status(row++, 0, "MOS OTP",       !(s1 & 0x40));
-    print_status(row++, 0, "Under-temp",    !(s1 & 0x02));
+    print_status(row++, 0, "Chg Under-T",   !(s1 & 0x02));
+    print_status(row++, 0, "Dchg Under-T",  !(s1 & 0x08));
 
     // ── Right: per-cell alarm grid ──
     int rrow = ROW_CONTENT;
@@ -407,7 +409,7 @@ void TUI::draw_alarms() {
 
     // Hardware faults
     ++rrow;
-    mvprintw(rrow++, col2, "  HARDWARE FAULTS");
+    if (rrow < LINES - 2) mvprintw(rrow++, col2, "  HARDWARE FAULTS");
     uint8_t s4 = alarm_.status[4];
     if (rrow < LINES - 2) print_status(rrow++, col2, "Charge MOS",    !(s4 & 0x01));
     if (rrow < LINES - 2) print_status(rrow++, col2, "Discharge MOS", !(s4 & 0x02));
