@@ -29,11 +29,11 @@ bool Serial::open(const std::string& port, int baud, int timeout_ms) {
     // Switch to blocking with VTIME timeout
     int flags = fcntl(fd_, F_GETFL, 0);
     if (flags < 0 || fcntl(fd_, F_SETFL, flags & ~O_NONBLOCK) < 0) {
-        ::close(fd_); fd_ = -1; return false;
+        int saved = errno; ::close(fd_); fd_ = -1; errno = saved; return false;
     }
 
     struct termios tty {};
-    if (tcgetattr(fd_, &tty) != 0) { ::close(fd_); fd_ = -1; return false; }
+    if (tcgetattr(fd_, &tty) != 0) { int saved = errno; ::close(fd_); fd_ = -1; errno = saved; return false; }
 
     cfsetispeed(&tty, to_baud(baud));
     cfsetospeed(&tty, to_baud(baud));
@@ -53,7 +53,7 @@ bool Serial::open(const std::string& port, int baud, int timeout_ms) {
     tty.c_cc[VMIN]  = 0;
     tty.c_cc[VTIME] = static_cast<uint8_t>(vtime);
 
-    if (tcsetattr(fd_, TCSANOW, &tty) != 0) { ::close(fd_); fd_ = -1; return false; }
+    if (tcsetattr(fd_, TCSANOW, &tty) != 0) { int saved = errno; ::close(fd_); fd_ = -1; errno = saved; return false; }
     tcflush(fd_, TCIOFLUSH);
     return true;
 }

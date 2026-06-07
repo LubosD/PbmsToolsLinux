@@ -5,7 +5,6 @@
 #include <cstring>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -34,12 +33,21 @@ int main(int argc, char* argv[]) {
 
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
-        if      (a == "--port"    && i+1 < argc) { port       = argv[++i]; }
-        else if (a == "--baud"    && i+1 < argc) { baud       = std::atoi(argv[++i]); }
-        else if (a == "--timeout" && i+1 < argc) { timeout_ms = std::atoi(argv[++i]); }
-        else if (a == "--pack"    && i+1 < argc) { pack       = static_cast<uint8_t>(std::atoi(argv[++i])); }
-        else if (a.substr(0,2) != "--")           { subcmd.push_back(a); }
-        else { std::cerr << "unknown flag: " << a << "\n"; return 1; }
+        if (a == "--port" || a == "--baud" || a == "--timeout" || a == "--pack") {
+            if (i+1 >= argc) { std::cerr << a << " requires a value\n"; return 1; }
+            if      (a == "--port")    port       = argv[++i];
+            else if (a == "--baud")    baud       = std::atoi(argv[++i]);
+            else if (a == "--timeout") timeout_ms = std::atoi(argv[++i]);
+            else { // --pack
+                int v = std::atoi(argv[++i]);
+                if (v < 1 || v > 15) { std::cerr << "--pack must be 1-15\n"; return 1; }
+                pack = static_cast<uint8_t>(v);
+            }
+        } else if (a.substr(0,2) != "--") {
+            subcmd.push_back(a);
+        } else {
+            std::cerr << "unknown flag: " << a << "\n"; return 1;
+        }
     }
 
     if (port.empty() || subcmd.empty()) { usage(argv[0]); return 1; }
@@ -65,7 +73,7 @@ int main(int argc, char* argv[]) {
     if (subcmd[0] == "info") {
         std::string version;
         if (!bms.get_version(pack, version, err)) { std::cerr << err << "\n"; return 1; }
-        std::cout << "pack=" << (int)pack << "\nversion=" << version << "\n";
+        std::cout << "pack=" << static_cast<int>(pack) << "\nversion=" << version << "\n";
         return 0;
     }
 
@@ -73,7 +81,7 @@ int main(int argc, char* argv[]) {
     if (subcmd[0] == "analog") {
         AnalogData a;
         if (!bms.get_analog(pack, a, err)) { std::cerr << err << "\n"; return 1; }
-        std::cout << "pack=" << (int)pack << "\n";
+        std::cout << "pack=" << static_cast<int>(pack) << "\n";
         std::cout << "cell_count=" << a.cell_count << "\n";
         for (int k = 0; k < a.cell_count; ++k)
             std::cout << "cell_" << (k+1) << "_mv=" << static_cast<int>(a.cell_mv[k]) << "\n";
@@ -96,7 +104,7 @@ int main(int argc, char* argv[]) {
     if (subcmd[0] == "alarm") {
         AlarmData al;
         if (!bms.get_alarm(pack, al, err)) { std::cerr << err << "\n"; return 1; }
-        std::cout << "pack=" << (int)pack << "\n";
+        std::cout << "pack=" << static_cast<int>(pack) << "\n";
         std::cout << "cell_count=" << al.cell_count << "\n";
         for (int k = 0; k < al.cell_count; ++k)
             std::cout << "cell_" << (k+1) << "_volt_alarm=" << (int)al.cell_volt_alarm[k] << "\n";
@@ -131,9 +139,9 @@ int main(int argc, char* argv[]) {
             bool has_thresh = false, has_delta = false;
             for (size_t i = 2; i < subcmd.size(); ++i) {
                 std::string v = get_kv(subcmd[i], "balance-threshold");
-                if (!v.empty()) { bp.threshold_v = std::stod(v); has_thresh = true; continue; }
+                if (!v.empty()) { bp.threshold_v = std::atof(v.c_str()); has_thresh = true; continue; }
                 v = get_kv(subcmd[i], "balance-delta");
-                if (!v.empty()) { bp.delta_mv = std::stoi(v); has_delta = true; continue; }
+                if (!v.empty()) { bp.delta_mv = std::atoi(v.c_str()); has_delta = true; continue; }
                 std::cerr << "unknown param: " << subcmd[i] << "\n"; return 1;
             }
             if (!has_thresh && !has_delta) {
