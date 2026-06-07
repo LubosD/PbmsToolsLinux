@@ -33,7 +33,7 @@ static void usage(const char* prog) {
                  "  utp-delay\n"
                  "  balance-threshold, balance-delta\n"
                  "  pack-b-volt, pack-b-value\n"
-                 "  equal-start, equal-delta, equal-cells\n"
+                 "  equal-start, equal-delta-pack, equal-cells\n"
                  "  chg-temp-enable, chg-temp-1 .. chg-temp-6\n"
                  "  dchg-temp-enable, dchg-temp-1 .. dchg-temp-6\n"
                  "  mos-chg-temp-enable, mos-chg-temp-1 .. mos-chg-temp-3\n"
@@ -325,7 +325,7 @@ int main(int argc, char* argv[]) {
                 if (!bms.get_equalization(p, err)) { std::cerr << "equalization: " << err << "\n"; return 1; }
                 std::cout << std::fixed << std::setprecision(3)
                           << "equal_start_v="  << p.start_v  << "\n"
-                          << "equal_delta_mv=" << p.delta_mv << "\n"
+                          << "equal_delta_pack_mv=" << p.delta_pack_mv << "\n"
                           << "equal_cell_cnt=" << p.cell_cnt << "\n";
             }
             // Charge temperature protection
@@ -476,7 +476,7 @@ int main(int argc, char* argv[]) {
 
                 // --- Equalization ---
                 if (!(v=get_kv(arg,"equal-start")).empty()) { equal.start_v  = std::atof(v.c_str()); seen.eq_start=true; has_equal=true; continue; }
-                if (!(v=get_kv(arg,"equal-delta")).empty()) { equal.delta_mv = std::atoi(v.c_str()); seen.eq_dlt=true;   has_equal=true; continue; }
+                if (!(v=get_kv(arg,"equal-delta-pack")).empty()) { equal.delta_pack_mv = std::atoi(v.c_str()); seen.eq_dlt=true;   has_equal=true; continue; }
                 if (!(v=get_kv(arg,"equal-cells")).empty()) { equal.cell_cnt = std::atoi(v.c_str()); seen.eq_cnt=true;   has_equal=true; continue; }
 
                 // --- Charge temperature group ---
@@ -635,7 +635,7 @@ int main(int argc, char* argv[]) {
                     EqualizationParams cur;
                     if (!bms.get_equalization(cur, err)) { std::cerr << "equalization read: " << err << "\n"; return 1; }
                     if (!seen.eq_start) equal.start_v  = cur.start_v;
-                    if (!seen.eq_dlt)   equal.delta_mv = cur.delta_mv;
+                    if (!seen.eq_dlt)   equal.delta_pack_mv = cur.delta_pack_mv;
                     if (!seen.eq_cnt)   equal.cell_cnt = cur.cell_cnt;
                 }
                 if (!bms.set_equalization(equal, err)) { std::cerr << "equalization write: " << err << "\n"; return 1; }

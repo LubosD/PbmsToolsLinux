@@ -497,14 +497,14 @@ bool BMS::get_equalization(EqualizationParams& out, std::string& err) {
     const auto& d = resp.data;
     if (d.size() < 4) { err = "equalization response too short"; return false; }
     out.start_v  = static_cast<uint16_t>((d[0] << 8) | d[1]) / 1000.0;
-    out.delta_mv = static_cast<int>(static_cast<uint16_t>((d[2] << 8) | d[3]));
+    out.delta_pack_mv = static_cast<int>(static_cast<uint16_t>((d[2] << 8) | d[3]));
     out.cell_cnt = (d.size() >= 5) ? static_cast<int>(d[4]) : 0;
     return true;
 }
 
 bool BMS::set_equalization(const EqualizationParams& p, std::string& err) {
     uint16_t raw_v = static_cast<uint16_t>(static_cast<int>(p.start_v * 1000.0 + 0.5));
-    uint16_t raw_d = static_cast<uint16_t>(p.delta_mv);
+    uint16_t raw_d = static_cast<uint16_t>(p.delta_pack_mv);
     std::vector<uint8_t> info = {
         static_cast<uint8_t>(raw_v >> 8), static_cast<uint8_t>(raw_v & 0xFF),
         static_cast<uint8_t>(raw_d >> 8), static_cast<uint8_t>(raw_d & 0xFF),

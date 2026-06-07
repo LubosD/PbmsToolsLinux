@@ -88,11 +88,11 @@ struct PackParamsBParams {
     int    value  = 0;
 };
 
-// Cell equalization parameters (CMD 0xAF / 0xAE) — params 30-31, 53
+// Pack equalization parameters (CMD 0xAF / 0xAE) — params 30-31, 53
 struct EqualizationParams {
-    double start_v  = 0.0;  // V (raw / 1000)
-    int    delta_mv = 0;
-    int    cell_cnt = 0;
+    double start_v      = 0.0;  // V (raw / 1000)
+    int    delta_pack_mv = 0;   // mV delta between packs
+    int    cell_cnt     = 0;
 };
 
 // Temperature protection group with up to 6 sensors + enable flag.
@@ -155,7 +155,7 @@ public:
     bool get_pack_b(PackParamsBParams& out, std::string& err);
     bool set_pack_b(const PackParamsBParams& p, std::string& err);
 
-    // Cell equalization (CMD 0xAF/0xAE) — params 30-31, 53
+    // Pack equalization (CMD 0xAF/0xAE) — params 30-31, 53
     bool get_equalization(EqualizationParams& out, std::string& err);
     bool set_equalization(const EqualizationParams& p, std::string& err);
 
